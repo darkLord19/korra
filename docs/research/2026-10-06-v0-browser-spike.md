@@ -1,6 +1,6 @@
 # v0 browser spike: findings
 
-**Date:** 2026-10-06 · **Code:** `apps/spike-local` (throwaway; delete once `apps/local` replaces it) · **Scope:** `docs/design/v0-client-only-and-declarations.md` §A7
+**Date:** 2026-10-06 · **Code:** `apps/spike-local` (deleted once `apps/local` replaced it; see git history at `da735ad`) · **Scope:** `docs/design/v0-client-only-and-declarations.md` §A7
 
 ## Verdict: feasible
 

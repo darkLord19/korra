@@ -34,6 +34,16 @@ KORRA_DEV_INMEMORY=1 pnpm --filter @korra/web dev
 
 ## Deploy
 
+### v0 (`apps/local`, the client-only app: this is what ships first)
+
+No database or env vars are needed: data lives in the user's browser.
+
+1. **Vercel**: import the GitHub repo, set **Root Directory** to `apps/local`, framework Next.js, and leave the build command as `pnpm build` (it runs `scripts/build.mjs`: the pdf.js worker copy, then a two-pass `next build --webpack` that bakes the strict hash-based CSP in). Keep **Include source files outside of the Root Directory in the Build Step** enabled so the workspace packages resolve. Do not override the build command with plain `next build`: without the hashes the app fails closed and does not start.
+2. Production branch: `main` (create it from `dev` first). No crons, no environment variables.
+3. After the first deploy, check the response headers on `/` carry the strict `Content-Security-Policy` (`script-src 'self' 'wasm-unsafe-eval' 'sha256-...'`, `connect-src 'self'`) and open the app once in a fresh browser profile to confirm it boots.
+
+### Phase 1 server app (`apps/web`; not deployed in v0)
+
 1. **Supabase** (region **ap-south-1, Mumbai**). Create a **private** storage bucket named `documents`. Collect the pooler URL (transaction mode, port 6543) for `DATABASE_URL`, the direct connection URL for `DATABASE_URL_DIRECT`, the project URL and the service role key.
 2. **Migrate**: `DATABASE_URL_DIRECT=... pnpm --filter @korra/db db:migrate` (creates the Better Auth and domain tables and enables RLS with no policies).
 3. **Vercel**: import the GitHub repo, set **Root Directory** to `apps/web`, framework Next.js. Because the app imports workspace packages from outside that directory, make sure **Include source files outside of the Root Directory in the Build Step** is enabled (Project Settings, Build and Deployment, Root Directory; it is on by default for projects created since 2020). Vercel detects pnpm from the root lockfile and installs the whole workspace. The region (`bom1`) and cron schedule come from `apps/web/vercel.json`.

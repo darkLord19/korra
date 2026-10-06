@@ -31,10 +31,10 @@ module.exports = {
   options: {
     doNotFollow: { path: "node_modules" },
     exclude: {
-      // apps/local (and its spike, apps/spike-local) are the client-only v0 apps: their "use client" modules
+      // apps/local is the client-only v0 apps: their "use client" modules
       // deliberately import the isomorphic entries (backend, db, db/browser, ...) to run the use-cases in the
       // browser. What may be reachable from them is enforced by the main config's iso-entries-* rules instead.
-      path: `(^|/)(\\.next|\\.turbo|node_modules)/|\\.test\\.tsx?$|^packages/ui/src/test-(utils|setup)\\.tsx?$|^packages/config/|^apps/(local|spike-local)/|${serverActionFiles}`,
+      path: `(^|/)(\\.next|\\.turbo|node_modules)/|\\.test\\.tsx?$|^packages/ui/src/test-(utils|setup)\\.tsx?$|^packages/config/|^apps/local/|${serverActionFiles}`,
     },
     tsPreCompilationDeps: false,
     enhancedResolveOptions: {

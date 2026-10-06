@@ -56,7 +56,6 @@ Korra is an EDF compliance tool for Indian service exporters. From 1 Oct 2026, e
 | `backend` | All use-cases are isomorphic (they run in Node or the browser). `/server` has `createDeps`, Better Auth, mailers and env. `/browser` has `createLocalDeps` and `ensureLocalOwner`. New: `createInvoiceManually`, `createPaymentManually`, `confirmAllFields` |
 | `ui` (V2a) | `@korra/ui`: isomorphic screens (month, tracker, pack, onboarding, settings) behind `KorraApi` (owner use-cases, `uploadFile`, `capabilities`, `KorraApiError`) and `KorraNav`. Hand entry and "I've checked these" are in the month view. `apps/web` is a server-action adapter (`src/server/actions.ts`, `src/client/server-api.ts`), behaviour unchanged |
 | `apps/local` (V2b) | Client-only v0 app: PGlite/IndexedDB boot, local `KorraApi`, strict hash-CSP two-pass build, persist/backup/restore/delete, `.ics`, "Export for my CA" (`declarations/` reserved), privacy notice and `/privacy`. `.ics`/CSV/CA-zip builders are in `@korra/packs`, schedule events in `@korra/core` |
-| `apps/spike-local` | Throwaway browser spike. Delete it once `apps/local` exists |
 
 Verified on `da735ad`:
 - lint, typecheck and build pass;
@@ -64,7 +63,7 @@ Verified on `da735ad`:
 - `pnpm e2e` passes;
 - CI passes.
 
-## 5. V2a is done
+## 5. V2a and V2b are done
 
 V2a was verified and committed: lint, depcruise (both configs), typecheck, build, unit tests and `pnpm e2e` all pass. The only fix needed was an e2e locator in `smoke.spec.ts`. Cell buttons have aria-labels ("Edit Payer"), so a table row's accessible name does not contain the value; match the button text instead.
 
@@ -84,13 +83,13 @@ V2a was verified and committed: lint, depcruise (both configs), typecheck, build
      - the pdf.js worker served from `/pdfjs/`.
    - **Data safety:** call `navigator.storage.persist()` and show the result; backup and restore UI with prompts; "Delete all local data".
    - **Other features:** `.ics` export, an "Export for my CA" zip, and the privacy copy, including advising "Add to Home Screen" on Safari.
-   - **CSP:** take the strict hash-based policy from `apps/spike-local`, with its fixed build id and two-pass build.
+   - **CSP:** the strict hash-based policy now lives in `apps/local` (the spike is deleted), with its fixed build id and two-pass build.
    - **e2e:**
      - the full flow;
      - **no requests leave the origin** when metrics are off;
      - the backup round trip;
      - tolerate the one harmless `ErrnoError` on cold boot.
-3. **V3: declarations end to end.**
+3. **V3: declarations end to end — DEFERRED (founder decision 2026-10-06: too much for the MVP).** Declarations are only useful once invoices have been declared and realised (first real use ~Jan 2027). The pure `core`/`packs` pieces are committed. A partial, unverified V3a (migration 0002–0004 incl. `pack_invoice` backfill, `inrEquivalent`, use-cases, tests) is parked in `git stash` (`v3a-declarations-wip`); treat it as a starting point, not as verified. Original spec:
    - **Migration:**
      - a `pack_invoice` link table, backfilled;
      - `declaration` and `declaration_invoice` tables;
@@ -102,11 +101,11 @@ V2a was verified and committed: lint, depcruise (both configs), typecheck, build
      - a Declarations tab;
      - the tracker shows "Closure declared";
      - a warning in the tracker for over-limit local transfers.
-4. **V4: metrics and deploy.**
+4. **V4: metrics and deploy** — trimmed: deploy `apps/local` and delete the spike first (spike deleted; deploy steps are in README). The `/api/metrics` endpoint and its Supabase project are optional until the founder wants them. Original spec:
    - `POST /api/metrics` in `apps/local` with a strict zod schema, writing a `metric_event` table in Supabase Mumbai.
    - A settings toggle (on by default) and the first-run copy.
    - An e2e check that only `/api/metrics` is called when the toggle is on.
-   - Deploy `apps/local` to Vercel (Hobby). Delete `apps/spike-local`.
+   - Deploy `apps/local` to Vercel (Hobby): see README "Deploy → v0". `apps/spike-local` is deleted.
 
 ## 7. Gotchas
 
