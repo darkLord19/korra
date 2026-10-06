@@ -1,5 +1,5 @@
 import { realisationOf, type Allocation, type InvoiceFacts, type PaymentFacts } from "@korra/core";
-import type { Ctx } from "./deps";
+import type { Ctx } from "./deps-types";
 import { NotFoundError, ValidationError } from "./errors";
 import {
   FieldValueError,

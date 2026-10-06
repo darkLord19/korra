@@ -31,7 +31,9 @@ module.exports = {
   options: {
     doNotFollow: { path: "node_modules" },
     exclude: {
-      path: `(^|/)(\\.next|\\.turbo|node_modules)/|\\.test\\.ts$|^packages/config/|${serverActionFiles}`,
+      // apps/spike-local is the client-only v0 spike: its "use client" modules deliberately import the
+      // isomorphic entries (db/iso, backend/core, ...) to run the use-cases in the browser.
+      path: `(^|/)(\\.next|\\.turbo|node_modules)/|\\.test\\.ts$|^packages/config/|^apps/spike-local/|${serverActionFiles}`,
     },
     tsPreCompilationDeps: false,
     enhancedResolveOptions: {

@@ -5,9 +5,12 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./iso": "./src/iso.ts",
+    "./browser": "./src/browser.ts",
     "./testing": "./src/testing.ts"
   },
   "scripts": {
+    "db:bundle-migrations": "node scripts/gen-migrations.mjs",
     "test": "vitest run",
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json",

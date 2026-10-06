@@ -8,12 +8,12 @@ import { fileURLToPath } from "node:url";
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import { migrate } from "drizzle-orm/pglite/migrator";
-import type { Db } from "./db";
-import type { MemoryBlobStore } from "./blob";
+import type { Db } from "./db-type";
+import type { MemoryBlobStore } from "./blob-core";
 import * as schema from "./schema";
 
-export { createMemoryBlobStore } from "./blob";
-export type { MemoryBlobStore } from "./blob";
+export { createMemoryBlobStore } from "./blob-core";
+export type { MemoryBlobStore } from "./blob-core";
 
 // KORRA_MIGRATIONS_DIR lets a bundled consumer (apps/web dev mode) point at the folder, since
 // import.meta.url is not a real file path once bundled.

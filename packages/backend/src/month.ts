@@ -5,7 +5,7 @@ import {
   type InvoiceFacts,
   type PackDraft,
 } from "@korra/core";
-import type { DocumentRecord, Repos } from "@korra/db";
+import type { DocumentRecord, Repos } from "@korra/db/iso";
 
 export const EMPTY_PROFILE: ExporterProfile = {
   legalName: "",

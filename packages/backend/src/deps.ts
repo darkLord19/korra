@@ -1,26 +1,11 @@
 import { createClaudeExtractor, createFakeExtractor, createIngester } from "@korra/ingest";
-import { createDb, createSupabaseBlobStore, type BlobStore, type Db } from "@korra/db";
-import type { Actor } from "@korra/db";
+import { createDb, createSupabaseBlobStore } from "@korra/db";
+import type { Deps } from "./deps-types";
 import { parseEnv, type Env } from "./env";
-import { createConsoleMailer, createResendMailer, type Mailer } from "./mailer";
+import { createConsoleMailer, createResendMailer } from "./mailer";
 
-export type Ingester = ReturnType<typeof createIngester>;
-
-export interface Deps {
-  db: Db;
-  blobs: BlobStore;
-  ingester: Ingester;
-  mailer: Mailer;
-  clock: () => Date;
-  appUrl: string;
-  /** Better Auth secret and base URL (deviation from the design doc's Deps: needed by createAuth). */
-  authSecret: string;
-  authUrl: string;
-}
-export interface Ctx {
-  deps: Deps;
-  actor: Actor;
-}
+// Types live in deps-types.ts (isomorphic); re-exported so existing imports keep working.
+export type { Ctx, Deps, Ingester } from "./deps-types";
 
 /** The real adapters. Tests build Deps with fakes (see `@korra/backend/testing`). */
 export function createDeps(rawEnv: Env | Record<string, string | undefined>): Deps {

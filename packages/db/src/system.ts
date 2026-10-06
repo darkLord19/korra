@@ -5,7 +5,7 @@
  */
 import type { Allocation, InvoiceFacts, YearMonth } from "@korra/core";
 import { and, asc, eq, lt, sql } from "drizzle-orm";
-import type { Db } from "./db";
+import type { Db } from "./db-type";
 import type { DocumentRecord } from "./repos";
 import { allocationFromRow, invoiceFromRow } from "./mapping";
 import * as s from "./schema";

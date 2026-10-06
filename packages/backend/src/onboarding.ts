@@ -1,5 +1,5 @@
 import type { ExporterProfile } from "@korra/core";
-import type { Ctx } from "./deps";
+import type { Ctx } from "./deps-types";
 import { NotFoundError } from "./errors";
 import { parse, repos, requireOwner } from "./internal";
 import { saveBankInput, saveProfileInput, type SaveBankInput, type SaveProfileInput } from "./inputs";

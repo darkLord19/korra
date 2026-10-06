@@ -1,5 +1,5 @@
 import { realisationOf, type InvoiceFacts } from "@korra/core";
-import type { Ctx } from "./deps";
+import type { Ctx } from "./deps-types";
 import { repos, todayOf } from "./internal";
 import { toWire } from "./wire";
 import type { MoneyWire, TrackerWire } from "./wire-types";

@@ -1,4 +1,4 @@
-import type { Ctx } from "./deps";
+import type { Ctx } from "./deps-types";
 import { acceptCaInviteInput, getCaInviteInput, inviteCaInput, revokeCaInput } from "./inputs";
 import { parse, repos, requireOwner } from "./internal";
 import { toWire } from "./wire";
