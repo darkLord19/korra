@@ -27,6 +27,10 @@ The founder wants the launch pitch to be: "Your PAN and invoices never leave you
 **What stays**
 - The server stack stays in the repo, tested, behind the same use-case interface. A `KorraApi` interface sits in front of the shared UI, with two adapters: server actions and in-browser calls.
 
+**Exception: anonymous usage counts**
+- Anonymous usage counts are sent by default and can be turned off. They contain no names, amounts or documents (scope doc §A9).
+- This is the one thing that leaves the device, and the privacy copy says so.
+
 ## Consequences
 
 **Benefits**
@@ -37,6 +41,6 @@ The founder wants the launch pitch to be: "Your PAN and invoices never leave you
 **Costs**
 - **Durability depends on the browser.** Backup and restore, `navigator.storage.persist()` and backup prompts are v0 features.
 - **Review takes longer** without AI extraction. "I've checked these" and manual entry mitigate this. The 15-minute goal needs to be measured again.
-- **The PRD metrics can't be collected** without some telemetry (open question Q-A1).
+- **The PRD metrics come from anonymous counts.** The CA count is not available in v0.
 - **Bundle size grows** with the PGlite WASM and pdf.js. The spike measures it.
 - **Moving to the server later** needs an import path from a `.korra` backup file into the server database.

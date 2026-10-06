@@ -51,8 +51,8 @@ This keeps one copy of the repository logic: the audit log, FIRA merge, re-inges
 
 ### A3. Apps and shared UI
 
-- **New `apps/local`:** Next.js with `output: "export"`, deployed to Vercel as static files.
-  - It has no server actions, route handlers or `proxy.ts`.
+- **New `apps/local`:** Next.js on Vercel. Every page is rendered in the browser, and the only server code is the metrics route (A9).
+  - It has no server actions or `proxy.ts`. Its one route handler is `/api/metrics`.
   - Dynamic pages become query params: `/month?m=2026-10` and `/pack?id=…`.
 - **New `packages/ui`:**
   - The month, pack and tracker views, and the onboarding and settings forms, move here from `apps/web`.
@@ -109,6 +109,39 @@ The spike settles these before the full build:
 5. **The CSP above** works with PGlite WASM and the pdf.js worker.
 6. **Safari eviction rules**, as in A5.
 
+### A9. Anonymous usage counts (on by default)
+
+The founder decided this on 2026-10-06. It is the one exception to "nothing leaves the device", and the copy must say so.
+
+- **Hosting:**
+  - `apps/local` is a normal Next.js app on Vercel, not `output: "export"`.
+  - Every page is rendered in the browser.
+  - The **only** server code is `POST /api/metrics`, served from the same origin, so the CSP can stay `connect-src 'self'`.
+- **Payload** (validated with a strict zod schema; any other key or value is rejected with 400):
+  - `installId`: a random UUID kept in `localStorage`. It is not linked to any identity.
+  - `event`: one of `app_opened` (at most once a day), `pack_generated`, `declaration_generated` or `backup_created`.
+  - `month`: the EDF month (`YYYY-MM`) for pack events.
+  - `rails`: the distinct rails used that month, for example `["deel"]`.
+  - `invoiceBucket`: one of `"1"`, `"2-5"`, `"6-10"` or `"11+"`.
+  - `appVersion`.
+- **What is never sent:** names, PAN, GSTIN, amounts, clients or documents.
+- **Storage:**
+  - One append-only `metric_event` table in the Supabase Mumbai project, written by the route through the existing server `db` entry.
+  - The route stores no IP address or user agent.
+  - Rate limit per `installId`.
+- **Metrics this supports:**
+  - monthly active filers (distinct installs with `pack_generated` for a month);
+  - the two-rails kill metric;
+  - month-on-month retention.
+  - It does **not** support the CA count, because v0 has no CAs.
+- **Settings:** a toggle labelled "Share anonymous usage counts", on by default. When it is off, nothing is sent.
+- **Copy:**
+  - On first run and in Settings: "Your documents and details never leave this device. Korra counts anonymous usage (which months you file, which payment rails) to improve the product — no names, amounts or documents. You can turn this off."
+  - ADR-0002 is amended to match.
+- **e2e:**
+  - With counts **off**, the full flow makes **zero** network requests that change server state. Fetching the app's own static assets is allowed.
+  - With counts **on**, the only such requests are `POST /api/metrics`, and every body matches the schema.
+
 ### A8. Dropped in v0
 
 | Phase 1 feature | v0 replacement |
@@ -119,7 +152,7 @@ The spike settles these before the full build:
 | Server-side account deletion | "Delete all local data", with a confirmation |
 | AI extraction (Claude) | Local text extraction plus review. Manual entry for scanned PDFs |
 | Pro billing | Not in v0 |
-| PRD metrics (monthly active filers, share with two or more rails, CA count) | **Undecided:** none, or anonymous counts with no document content. See Q-A1 |
+| PRD metrics | **Anonymous counts, on by default, can be turned off in Settings.** See A9 |
 
 ---
 
@@ -207,9 +240,6 @@ An invoice is eligible when all of these hold:
 
 ## Open questions
 
-- **Q-A1. Metrics.** The PRD's kill metric (≥30% of paying users on two or more rails) and the north-star metric need *some* signal. The options:
-  - (a) none in v0;
-  - (b) anonymous counts with no document content, for example "a pack was generated, with N rails", sent to a first-party endpoint. That needs one tiny server route and has to be stated in the privacy copy;
-  - (c) an opt-in "share anonymous usage" toggle.
+- **Q-A1. Metrics.** Resolved 2026-10-06: anonymous counts, on by default (A9).
 - **Q-A2. Safari durability.** Record the findings from the spike (A5).
 - **Q-B1. Bank formats.** Real declaration formats from ICICI, HDFC and Axis are part of the week-1 bank format collection.
