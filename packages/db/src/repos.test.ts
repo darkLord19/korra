@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import type { Field, InvoiceFacts, PaymentFacts } from "@korra/core";
+import type { Field, InvoiceFacts, Money, PaymentFacts } from "@korra/core";
 import { beforeEach, describe, expect, it } from "vitest";
 import {
   type Actor,
@@ -33,6 +33,7 @@ function invoiceFacts(over: Partial<Omit<InvoiceFacts, "id">> = {}): Omit<Invoic
     clientCountry: f("US"),
     amount: f({ minor: 123_456_789_012_345_678n, currency: "USD" }),
     netRealisableValue: f({ minor: 100_000n, currency: "USD" }),
+    inrEquivalent: f<Money>(null, 0, "default"),
     contractRef: f<string>(null, 0),
     serviceDescription: f("Software services"),
     sacCode: f("998314"),

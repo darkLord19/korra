@@ -1,0 +1,58 @@
+{
+  "kind": "declaration",
+  "id": "declaration-icici",
+  "version": "0",
+  "bankName": "ICICI Bank",
+  "placeholder": true,
+  "columns": [
+    {
+      "header": "Invoice no",
+      "key": "invoiceNo"
+    },
+    {
+      "header": "Invoice date",
+      "key": "invoiceDate"
+    },
+    {
+      "header": "EDF month",
+      "key": "edfMonth"
+    },
+    {
+      "header": "Client name",
+      "key": "clientName"
+    },
+    {
+      "header": "Currency",
+      "key": "currency"
+    },
+    {
+      "header": "Invoice amount",
+      "key": "invoiceAmount"
+    },
+    {
+      "header": "INR equivalent",
+      "key": "inrEquivalent"
+    },
+    {
+      "header": "Realised amount",
+      "key": "realisedAmount"
+    },
+    {
+      "header": "Status",
+      "key": "status"
+    },
+    {
+      "header": "Payment date(s)",
+      "key": "paymentDates"
+    },
+    {
+      "header": "Payment reference(s)",
+      "key": "references"
+    },
+    {
+      "header": "Receipt mode",
+      "key": "receiptModes"
+    }
+  ],
+  "guide": "# How to submit your declaration to {bank}\n\n**Note: the ICICI Bank declaration format is unverified.** RBI prescribes no format and Korra does not yet have ICICI Bank's own template, so this declaration uses a generic layout. Check with your bank whether it accepts it or needs its own form.\n\nPeriod: {period}.\n\nUnder Regulation 4(2) of the Foreign Exchange Management (Export and Import of Goods and Services) Regulations, 2026, the EDPMS entry for a services invoice of up to INR 10 lakh (or its equivalent in foreign currency) may be closed based on a declaration from the exporter that payment has been realised in full or otherwise. Under Regulation 6, a reduction or non-realisation for such an invoice may be permitted on a declaration from the exporter. Declarations may be made quarterly for bulk closure. Your bank decides whether to accept this declaration: it may close the entries, but nothing here guarantees it.\n\n1. Check the attached PDF and XLSX. They list each invoice, with its payment evidence.\n2. Sign and date the PDF, and add the place.\n3. Submit it to your AD bank or relationship manager, through the bank's trade or forex portal or in person.\n4. Keep the acknowledgement the bank gives you.\n5. Upload the acknowledgement back to Korra and mark the declaration as submitted.\n\nKorra does not submit anything to the bank. Prepared by Korra. Not legal or tax advice. Your bank decides whether to accept this declaration.\n"
+}

@@ -46,6 +46,7 @@ async function createDevDeps(): Promise<Deps> {
     invoices: [{
       invoiceNo: f("INV-2026-014"), invoiceDate: f("2026-09-02"), clientName: f("Acme Corp"),
       clientAddress: f("1 Main St, New York"), clientCountry: f("US"), amount: f(usd(150000n)), netRealisableValue: f(usd(150000n)),
+      inrEquivalent: { value: null, confidence: 0, source: "default" },
       contractRef: f<string>(null, 0), serviceDescription: f("Software development services"), sacCode: f("998314", 0.6),
     }],
   };

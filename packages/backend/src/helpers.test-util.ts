@@ -28,6 +28,7 @@ export function invoiceResult(over: Partial<Omit<InvoiceFacts, "id" | "adBankId"
         clientCountry: f("US"),
         amount: f(usd(1500)),
         netRealisableValue: f(usd(1500)),
+        inrEquivalent: { value: null, confidence: 0, source: "default" },
         contractRef: f<string>(null, 0),
         serviceDescription: f("Software development services"),
         sacCode: f("998314"),

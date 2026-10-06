@@ -22,6 +22,7 @@ export function invoice(
     clientCountry: f("US"),
     amount: f(amount),
     netRealisableValue: f(amount),
+    inrEquivalent: f<Money>(null, 0, "default"),
     contractRef: f<string>(null),
     serviceDescription: f("Software development services"),
     sacCode: f("998314"),

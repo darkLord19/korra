@@ -18,14 +18,14 @@ export function sanitise(font: PDFFont, s: string): string {
   return out;
 }
 
-function fit(font: PDFFont, text: string, size: number, width: number): string {
+export function fit(font: PDFFont, text: string, size: number, width: number): string {
   if (font.widthOfTextAtSize(text, size) <= width) return text;
   let t = text;
   while (t.length > 1 && font.widthOfTextAtSize(t + "...", size) > width) t = t.slice(0, -1);
   return t + "...";
 }
 
-function wrap(font: PDFFont, text: string, size: number, width: number, maxLines: number): string[] {
+export function wrap(font: PDFFont, text: string, size: number, width: number, maxLines: number): string[] {
   const lines: string[] = [];
   let cur = "";
   for (const word of text.split(" ")) {
