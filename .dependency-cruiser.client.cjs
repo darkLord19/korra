@@ -20,7 +20,12 @@ module.exports = {
       severity: "error",
       comment: 'A "use client" module (transitively) imports a server-only workspace package.',
       from: { path: clientFiles },
-      to: { path: "^(packages/|@korra/)(backend|db|ingest|packs)(/|$)", reachable: true },
+      // `@korra/backend/schemas` (zod input schemas + wire types; pure, no server-only/db) is allowed.
+      to: {
+        path: "^(packages/|@korra/)(backend|db|ingest|packs)(/|$)",
+        pathNot: "^(packages/backend/src/(schemas|inputs|wire-types)\\.ts|@korra/backend/schemas)$",
+        reachable: true,
+      },
     },
   ],
   options: {

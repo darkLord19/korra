@@ -8,7 +8,7 @@ import type {
   PaymentFacts,
   YearMonth,
 } from "@korra/core";
-import { and, asc, eq, inArray, ne, or } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, ne, or } from "drizzle-orm";
 import { blobKeyFor } from "./blob";
 import type { Db } from "./db";
 import { ForbiddenError, NotFoundError, ValidationError } from "./errors";
@@ -196,6 +196,40 @@ export function createRepos(db: Db, actor: Actor, opts: RepoOptions = {}) {
         .returning();
       return row!;
     },
+    /**
+     * Idempotent re-ingest support: deletes the invoices and payments extracted from this document
+     * (their proposed allocations cascade). Refuses with ValidationError when the user has already
+     * worked on any of them (a field edit, or a confirmed/rejected allocation), so edits are never lost.
+     */
+    async deleteExtracted(documentId: string): Promise<{ invoices: number; payments: number }> {
+      const uid = writeOwner();
+      return db.transaction(async (tx) => {
+        await assertOwnsDocument(tx, uid, documentId);
+        const inv = await tx.select({ id: s.invoice.id }).from(s.invoice).where(and(eq(s.invoice.userId, uid), eq(s.invoice.documentId, documentId)));
+        const pay = await tx.select({ id: s.payment.id }).from(s.payment).where(and(eq(s.payment.userId, uid), eq(s.payment.documentId, documentId)));
+        const invIds = inv.map((r) => r.id);
+        const payIds = pay.map((r) => r.id);
+        const entityIds = [...invIds, ...payIds];
+        if (entityIds.length === 0) return { invoices: 0, payments: 0 };
+        const edited = await tx.select({ id: s.fieldEdit.id }).from(s.fieldEdit).where(inArray(s.fieldEdit.entityId, entityIds)).limit(1);
+        const decided = await tx
+          .select({ id: s.allocation.invoiceId })
+          .from(s.allocation)
+          .where(
+            and(
+              ne(s.allocation.status, "proposed"),
+              or(invIds.length ? inArray(s.allocation.invoiceId, invIds) : undefined, payIds.length ? inArray(s.allocation.paymentId, payIds) : undefined),
+            ),
+          )
+          .limit(1);
+        if (edited.length || decided.length) {
+          throw new ValidationError("This document's records have been edited or matched; they were kept. Delete the records first or re-upload as a new document.");
+        }
+        if (invIds.length) await tx.delete(s.invoice).where(inArray(s.invoice.id, invIds));
+        if (payIds.length) await tx.delete(s.payment).where(inArray(s.payment.id, payIds));
+        return { invoices: invIds.length, payments: payIds.length };
+      });
+    },
     /** Record what ingest decided this document is (and optionally its month). */
     async setKind(id: string, kind: DocumentKind, month?: YearMonth | null): Promise<DocumentRecord> {
       const uid = writeOwner();
@@ -270,6 +304,20 @@ export function createRepos(db: Db, actor: Actor, opts: RepoOptions = {}) {
         .orderBy(asc(s.invoice.createdAt), asc(s.invoice.id));
       return rows.map(invoiceFromRow);
     },
+    /**
+     * Invoices of a month: those dated in it, plus undated ones extracted from a document filed under
+     * that month (so they can block a pack instead of vanishing). Includes each invoice's source document id.
+     */
+    async listForMonth(month: YearMonth): Promise<{ facts: InvoiceFacts; documentId: string | null; undated: boolean }[]> {
+      const uid = await readOwner();
+      const rows = await db
+        .select({ inv: s.invoice })
+        .from(s.invoice)
+        .leftJoin(s.document, eq(s.document.id, s.invoice.documentId))
+        .where(and(eq(s.invoice.userId, uid), or(eq(s.invoice.month, month), and(isNull(s.invoice.month), eq(s.document.month, month)))))
+        .orderBy(asc(s.invoice.createdAt), asc(s.invoice.id));
+      return rows.map(({ inv }) => ({ facts: invoiceFromRow(inv), documentId: inv.documentId, undated: inv.month === null }));
+    },
     /** `documentId` may be null (manually created). Month and ad_bank_id are derived from the field values. */
     async insertExtracted(documentId: string | null, facts: Omit<InvoiceFacts, "id">[]): Promise<string[]> {
       const uid = writeOwner();
@@ -332,6 +380,15 @@ export function createRepos(db: Db, actor: Actor, opts: RepoOptions = {}) {
     async updateField<K extends PaymentFieldName>(id: string, field: K, value: FieldValue<PaymentFacts[K]>): Promise<PaymentFacts> {
       if (!(PAYMENT_FIELDS as readonly string[]).includes(field)) throw new ValidationError(`unknown payment field: ${field}`);
       return paymentFromRow(await auditedUpdate("payment", id, field, field, value));
+    },
+    /** Source document and linked NOC document of every payment, by payment id. */
+    async links(): Promise<Record<string, { documentId: string | null; nocDocumentId: string | null }>> {
+      const uid = await readOwner();
+      const rows = await db
+        .select({ id: s.payment.id, documentId: s.payment.documentId, nocDocumentId: s.payment.nocDocumentId })
+        .from(s.payment)
+        .where(eq(s.payment.userId, uid));
+      return Object.fromEntries(rows.map((r) => [r.id, { documentId: r.documentId, nocDocumentId: r.nocDocumentId }]));
     },
     async linkNoc(paymentId: string, documentId: string): Promise<void> {
       const uid = writeOwner();
@@ -446,11 +503,12 @@ export function createRepos(db: Db, actor: Actor, opts: RepoOptions = {}) {
 
   /* ------------------------------- packs ------------------------------- */
   const packs = {
-    async create(p: { month: YearMonth; adBankId: string; layoutId: string; files: PackFile[] }): Promise<PackRecord> {
+    /** `id` may be supplied so file blob keys (`u/{user}/packs/{id}/...`) can be built first. */
+    async create(p: { id?: string; month: YearMonth; adBankId: string; layoutId: string; files: PackFile[] }): Promise<PackRecord> {
       const uid = writeOwner();
       const [row] = await db
         .insert(s.pack)
-        .values({ id: newId(), userId: uid, ...p, generatedAt: now() })
+        .values({ ...p, id: p.id ?? newId(), userId: uid, generatedAt: now() })
         .returning();
       return row!;
     },

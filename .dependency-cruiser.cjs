@@ -30,6 +30,13 @@ module.exports = {
       "apps/web reaches behaviour only through @korra/backend.",
     ),
     {
+      name: "backend-schemas-pure",
+      comment: "The client-safe schemas entry may import only zod and core, never db, ingest, packs or server-only.",
+      severity: "error",
+      from: { path: "^packages/backend/src/(schemas|inputs|wire-types)\\.ts$" },
+      to: { path: "^(packages/(db|ingest|packs)/|@korra/(db|ingest|packs)(/|$)|server-only|node_modules/server-only)" },
+    },
+    {
       name: "no-circular",
       severity: "error",
       from: {},

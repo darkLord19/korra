@@ -99,8 +99,8 @@ function toRow(draft: PackDraft, inv: InvoiceFacts): EdfRow {
 }
 
 /**
- * Readiness depends only on the exporter profile and the invoices of `draft.month` filed
- * with `draft.adBank`. Payments never block. Blockers are listed in a stable order:
+ * Readiness depends only on the exporter profile and the draft's invoices: those dated in
+ * `draft.month` (or undated, which blocks) filed with `draft.adBank` (or with no bank yet, which blocks). Payments never block. Blockers are listed in a stable order:
  * no_invoices, exporter fields, invoice fields (by id; missing before flagged per field
  * order), pending documents.
  */
@@ -112,8 +112,12 @@ export function assessPack(
 
   const included = draft.invoices
     .filter((inv) => {
+      const bankOk = inv.adBankId.value === null || inv.adBankId.value === draft.adBank.id;
+      if (!bankOk) return false;
       const d = inv.invoiceDate.value;
-      return d !== null && yearMonthOf(d) === draft.month && inv.adBankId.value === draft.adBank.id;
+      // An undated invoice the caller put in this month's draft must block (missing invoiceDate),
+      // never be silently dropped: dropping it could leave an export undeclared.
+      return d === null || yearMonthOf(d) === draft.month;
     })
     .sort((a, b) => cmp(a.id, b.id));
 

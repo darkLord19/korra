@@ -5,6 +5,7 @@ import {
   type Actor,
   type Db,
   ForbiddenError,
+  ValidationError,
   NotFoundError,
   countCasWithAtLeast,
   createRepos,
@@ -428,5 +429,59 @@ describe("row level security", () => {
     expect(rows.filter((r) => !r.relrowsecurity)).toEqual([]);
     const pol = (await db.execute(`select 1 from pg_policies`)) as unknown as { rows: unknown[] };
     expect(pol.rows).toEqual([]);
+  });
+});
+
+describe("re-ingest support", () => {
+  it("deleteExtracted removes a document's rows, but refuses once the user has edited or decided them", async () => {
+    const ra = createRepos(db, owner(a.id));
+    const doc = await ra.documents.create({ filename: "x.pdf", mimeType: "application/pdf", month: "2026-10" });
+    const [iid] = await ra.invoices.insertExtracted(doc.id, [invoiceFacts()]);
+    const [pid] = await ra.payments.insertExtracted(doc.id, [paymentFacts()]);
+    expect(await ra.documents.deleteExtracted(doc.id)).toEqual({ invoices: 1, payments: 1 });
+    expect(await ra.invoices.list()).toEqual([]);
+    expect(await ra.payments.list()).toEqual([]);
+
+    const [i2] = await ra.invoices.insertExtracted(doc.id, [invoiceFacts()]);
+    await ra.invoices.updateField(i2!, "clientName", "Edited");
+    await expect(ra.documents.deleteExtracted(doc.id)).rejects.toBeInstanceOf(ValidationError);
+    expect(await ra.invoices.list()).toHaveLength(1);
+    void iid; void pid;
+
+    const rb = createRepos(db, owner(b.id));
+    await expect(rb.documents.deleteExtracted(doc.id)).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  it("deleteExtracted refuses after a confirmed allocation", async () => {
+    const ra = createRepos(db, owner(a.id));
+    const doc = await ra.documents.create({ filename: "x.pdf", mimeType: "application/pdf" });
+    const [iid] = await ra.invoices.insertExtracted(doc.id, [invoiceFacts()]);
+    const [pid] = await ra.payments.insertExtracted(null, [paymentFacts()]);
+    await ra.allocations.replaceProposed([{ invoiceId: iid!, paymentId: pid!, amount: { minor: 1n, currency: "USD" }, score: 1, status: "proposed" }]);
+    await ra.allocations.setStatus(iid!, pid!, "confirmed");
+    await expect(ra.documents.deleteExtracted(doc.id)).rejects.toBeInstanceOf(ValidationError);
+  });
+
+  it("listForMonth includes undated invoices of that month's documents; links() exposes document ids", async () => {
+    const ra = createRepos(db, owner(a.id));
+    const doc = await ra.documents.create({ filename: "u.pdf", mimeType: "application/pdf", month: "2026-10" });
+    const other = await ra.documents.create({ filename: "o.pdf", mimeType: "application/pdf", month: "2026-09" });
+    await ra.invoices.insertExtracted(doc.id, [invoiceFacts({ invoiceDate: f<string>(null, 0) })]);
+    await ra.invoices.insertExtracted(other.id, [invoiceFacts({ invoiceDate: f<string>(null, 0) })]);
+    await ra.invoices.insertExtracted(null, [invoiceFacts()]);
+    const rows = await ra.invoices.listForMonth("2026-10");
+    expect(rows.map((r) => r.undated).sort()).toEqual([false, true]);
+    expect(rows.find((r) => r.undated)!.documentId).toBe(doc.id);
+
+    const noc = await ra.documents.create({ filename: "n.pdf", mimeType: "application/pdf" });
+    const [pid] = await ra.payments.insertExtracted(doc.id, [paymentFacts()]);
+    await ra.payments.linkNoc(pid!, noc.id);
+    expect((await ra.payments.links())[pid!]).toEqual({ documentId: doc.id, nocDocumentId: noc.id });
+  });
+
+  it("packs.create accepts a caller-chosen id", async () => {
+    const ra = createRepos(db, owner(a.id));
+    const p = await ra.packs.create({ id: "pack-xyz", month: "2026-10", adBankId: "bank-1", layoutId: "generic", files: [] });
+    expect(p.id).toBe("pack-xyz");
   });
 });

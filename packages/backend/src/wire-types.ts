@@ -1,0 +1,121 @@
+/**
+ * Wire types: what use-cases hand to apps/web. No bigint, no Date (ISO strings), plain JSON.
+ * Type-only module (safe to `import type` from client components).
+ */
+import type { AdBank, Allocation, Blocker, ExporterProfile, InvoiceFacts, PaymentFacts, Realisation } from "@korra/core";
+
+/** bigint -> string, Date -> string, recursively. */
+export type Wire<T> = T extends bigint
+  ? string
+  : T extends Date
+    ? string
+    : T extends readonly (infer U)[]
+      ? Wire<U>[]
+      : T extends object
+        ? { [K in keyof T]: Wire<T[K]> }
+        : T;
+
+export type MoneyWire = { minor: string; currency: string };
+export type InvoiceWire = Wire<InvoiceFacts> & { documentId: string | null };
+export type PaymentWire = Wire<PaymentFacts> & { documentId: string | null; nocDocumentId: string | null };
+export type AllocationWire = Wire<Allocation>;
+export type RealisationWire = Wire<Realisation>;
+export type BlockerWire = Blocker;
+export type AdBankWire = AdBank;
+export type ExporterProfileWire = ExporterProfile;
+
+export interface DocumentWire {
+  id: string;
+  kind: "invoice" | "statement" | "fira" | "noc" | "unknown" | null;
+  month: string | null;
+  filename: string;
+  mimeType: string;
+  status: "uploaded" | "ingesting" | "ingested" | "failed";
+  attempts: number;
+  error: string | null;
+  createdAt: string;
+}
+
+export interface PackWire {
+  id: string;
+  month: string;
+  adBankId: string;
+  layoutId: string;
+  status: "generated" | "submitted";
+  files: { name: string; mimeType: string }[];
+  generatedAt: string;
+  submittedAt: string | null;
+}
+
+export interface OnboardingWire {
+  profile: ExporterProfileWire | null;
+  banks: AdBankWire[];
+  complete: boolean;
+}
+
+export interface RequestUploadResult {
+  documentId: string;
+  uploadUrl: string;
+  token: string;
+}
+
+export interface MonthStateWire {
+  month: string;
+  documents: DocumentWire[];
+  invoices: InvoiceWire[];
+  payments: PaymentWire[];
+  allocations: AllocationWire[];
+  /** By invoice id. Only invoices that have a date and an amount. */
+  realisations: Record<string, RealisationWire>;
+  blockersByBank: { adBankId: string; adBankName: string; blockers: BlockerWire[] }[];
+  pendingDocumentIds: string[];
+}
+
+export type GeneratePackResult =
+  | { ok: true; packId: string; layoutId: string; placeholder: boolean }
+  | { ok: false; blockers: BlockerWire[] };
+
+export interface PackDownloadsWire {
+  pack: PackWire;
+  placeholder: boolean;
+  files: { name: string; mimeType: string; url: string }[];
+}
+
+export interface TrackerRowWire {
+  invoice: InvoiceWire;
+  realisation: RealisationWire;
+}
+
+export interface TrackerWire {
+  asOf: string;
+  /** Per currency. `outstanding` covers every non-realised invoice (overdue ones included). */
+  totals: { outstanding: MoneyWire[]; due60: MoneyWire[]; overdue: MoneyWire[] };
+  rows: TrackerRowWire[];
+}
+
+export interface CaShareWire {
+  id: string;
+  caEmail: string;
+  status: "invited" | "accepted" | "revoked";
+  createdAt: string;
+  acceptedAt: string | null;
+}
+
+export interface CaClientWire {
+  shareId: string;
+  ownerUserId: string;
+  ownerName: string;
+  ownerEmail: string;
+  acceptedAt: string | null;
+}
+
+export interface NotificationRunResult {
+  sent: number;
+  skipped: number;
+  failed: number;
+}
+
+export interface SweepResult {
+  requeued: number;
+  failed: number;
+}

@@ -52,6 +52,16 @@ describe("assessPack", () => {
     expect(blockers(draft({ invoices: unrelated }))).toEqual([{ kind: "no_invoices" }]);
   });
 
+  it("undated invoice in the draft blocks with missing invoiceDate (not dropped)", () => {
+    const undated = invoice("u1", { date: null });
+    const bs = blockers(draft({ invoices: [invoice("i1"), undated] }));
+    expect(bs).toEqual([{ kind: "missing_field", entity: "invoice", id: "u1", field: "invoiceDate" }]);
+    // null adBank also counts; a different bank does not
+    undated.adBankId = f<string>(null);
+    expect(blockers(draft({ invoices: [undated] }))).toContainEqual({ kind: "missing_field", entity: "invoice", id: "u1", field: "invoiceDate" });
+    expect(assessPack(draft({ invoices: [invoice("i1"), invoice("u2", { date: null, bank: "other" })] }), NOW).ok).toBe(true);
+  });
+
   it("missing exporter and invoice fields", () => {
     const inv = invoice("i1");
     inv.sacCode = f<string>(null);
