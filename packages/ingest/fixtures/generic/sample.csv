@@ -1,0 +1,3 @@
+date,amount,currency,inr_credited,fx_rate,fees,fira_ref,purpose_code,payer,receipt_mode,bank
+2026-09-10,"2,500.00",USD,"208,750.00",83.50,10.00,,,Acme Corp,local_transfer,Partner Bank
+2026-09-18,1200.00,EUR,,,,FIRA/SYN/0042,P0802,Globex GmbH,swift,Example Bank Ltd
