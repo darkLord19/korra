@@ -124,6 +124,7 @@ function invoice(i: number): InvoiceFacts {
     serviceDescription: f("Software development services"),
     sacCode: f("998314"),
     adBankId: f(BANK_ID),
+    inrEquivalent: { value: null, confidence: 0, source: "default" },
   };
 }
 
