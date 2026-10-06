@@ -1,8 +1,9 @@
+import { addDays, diffDays, lastDayOfMonth } from "./dates";
 import type { IsoDate, YearMonth } from "./types";
 
-export function edfDueDate(_month: YearMonth): IsoDate {
+export function edfDueDate(month: YearMonth): IsoDate {
   // last day of month + 30 days
-  throw new Error("not implemented");
+  return addDays(lastDayOfMonth(month), 30);
 }
 
 export interface NotificationIntent {
@@ -31,6 +32,51 @@ export interface ScheduleUserState {
 }
 export type ScheduleState = ScheduleUserState[];
 
-export function dueNotifications(_state: ScheduleState, _today: IsoDate): NotificationIntent[] {
-  throw new Error("not implemented");
+const EDF_THRESHOLDS = [10, 3] as const;
+const REALISATION_THRESHOLDS = [60, 30] as const;
+/** Catch-up window: a threshold also fires on the following 2 days, in case a cron run was missed. */
+const CATCH_UP_DAYS = 2;
+
+/** True when `today` is in [dueDate - threshold, dueDate - threshold + CATCH_UP_DAYS]. */
+function inWindow(dueDate: IsoDate, today: IsoDate, threshold: number): boolean {
+  const daysLeft = diffDays(today, dueDate);
+  return daysLeft <= threshold && daysLeft >= threshold - CATCH_UP_DAYS;
+}
+
+/**
+ * Reminders that should be sent on `today`. Each threshold fires on its exact day and,
+ * to survive a missed cron run, on the next two days as well (the windows never overlap,
+ * so at most one intent per threshold). The sender must treat `dedupeKey` as idempotent so
+ * the catch-up days do not produce duplicate emails.
+ */
+export function dueNotifications(state: ScheduleState, today: IsoDate): NotificationIntent[] {
+  const out: NotificationIntent[] = [];
+  for (const user of state) {
+    for (const m of user.months) {
+      if (!m.hasDeclaredInvoices || m.submitted) continue;
+      const dueDate = edfDueDate(m.month);
+      for (const t of EDF_THRESHOLDS) {
+        if (!inWindow(dueDate, today, t)) continue;
+        out.push({
+          userId: user.userId,
+          kind: "edf_due",
+          dedupeKey: `edf_due:${m.month}:d${t}`,
+          vars: { month: m.month, dueDate },
+        });
+      }
+    }
+    for (const inv of user.invoices) {
+      if (inv.status === "realised") continue;
+      for (const t of REALISATION_THRESHOLDS) {
+        if (!inWindow(inv.deadline, today, t)) continue;
+        out.push({
+          userId: user.userId,
+          kind: "realisation_due",
+          dedupeKey: `realisation_due:${inv.id}:d${t}`,
+          vars: { invoiceNo: inv.invoiceNo, deadline: inv.deadline },
+        });
+      }
+    }
+  }
+  return out;
 }
