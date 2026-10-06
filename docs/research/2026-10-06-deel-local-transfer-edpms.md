@@ -30,7 +30,7 @@ The EDF is filed with an AD bank, which logs the export in EDPMS and closes the 
 
 1. **Where to file:** the exporter files the EDF with their own AD bank, the same as for any other invoice.
 2. **Invoices up to ₹10 lakh (or the foreign-currency equivalent):**
-   - The bank closes the EDPMS entry on the exporter's declaration that the invoice has been realised. No FIRA is needed.
+   - The bank **may** close the EDPMS entry on the exporter's declaration that the invoice has been realised (Reg. 4(2) says "may be closed", so it is the bank's choice). No FIRA is needed.
    - The declaration can be sent invoice by invoice, or as a quarterly bulk declaration.
    - Nearly all freelancer invoices fall in this case. ₹10 lakh is roughly USD 11–12k.
 3. **Invoices above ₹10 lakh paid by Deel local transfer:**
