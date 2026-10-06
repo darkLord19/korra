@@ -1,0 +1,22 @@
+{
+  "name": "korra",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.28.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "typecheck": "turbo run typecheck",
+    "lint": "turbo run lint && pnpm depcruise",
+    "depcruise": "depcruise apps packages --config .dependency-cruiser.cjs && depcruise apps packages --config .dependency-cruiser.client.cjs"
+  },
+  "devDependencies": {
+    "dependency-cruiser": "^18.5.0",
+    "eslint": "^9.39.0",
+    "turbo": "^2.11.7",
+    "typescript": "~6.0.3"
+  }
+}

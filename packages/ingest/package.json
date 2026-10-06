@@ -1,0 +1,22 @@
+{
+  "name": "@korra/ingest",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": {
+    "test": "vitest run",
+    "lint": "eslint .",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "server-only": "^0.0.1",
+    "@korra/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@korra/config": "workspace:*",
+    "@types/node": "^22.20.5",
+    "typescript": "~6.0.3",
+    "vitest": "^5.0.3"
+  }
+}
