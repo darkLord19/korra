@@ -14,6 +14,12 @@ function parseFieldErrors(message: string): Record<string, string> {
   return out;
 }
 
+/** For pages: a missing/forbidden record becomes the 404 page; anything else is rethrown. */
+export function notFoundOrThrow(e: unknown): never {
+  if (e instanceof NotFoundError) notFound();
+  throw e;
+}
+
 /**
  * Maps backend errors for server actions / pages:
  * ValidationError -> returned state; NotFound -> notFound(); Unauthenticated -> /sign-in; Forbidden -> message.

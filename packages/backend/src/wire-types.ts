@@ -26,7 +26,7 @@ export type ExporterProfileWire = ExporterProfile;
 
 export interface DocumentWire {
   id: string;
-  kind: "invoice" | "statement" | "fira" | "noc" | "unknown" | null;
+  kind: "invoice" | "statement" | "fira" | "noc" | "ack" | "unknown" | null;
   month: string | null;
   filename: string;
   mimeType: string;
@@ -99,6 +99,18 @@ export interface CaShareWire {
   status: "invited" | "accepted" | "revoked";
   createdAt: string;
   acceptedAt: string | null;
+}
+
+/** An invite as the invited person sees it on the accept page. */
+export interface CaInviteWire {
+  ownerUserId: string;
+  ownerName: string;
+  caEmail: string;
+  status: "invited" | "accepted" | "revoked";
+  /** The signed-in user's email is the one that was invited. */
+  emailMatches: boolean;
+  /** The signed-in user is the one who sent it. */
+  isOwner: boolean;
 }
 
 export interface CaClientWire {

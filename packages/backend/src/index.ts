@@ -20,7 +20,7 @@ export { getMonthState, editField, decideAllocation, linkNoc } from "./review";
 export { generatePack, getPackDownloads, markPackSubmitted, listPacks, layoutIdFor, isPlaceholderLayout } from "./packs";
 export { getTracker } from "./tracker";
 export { runDailyNotifications, composeNotification } from "./notifications";
-export { inviteCa, acceptCaInvite, listCaClients, listMyCas, revokeCa } from "./ca";
+export { inviteCa, getCaInvite, acceptCaInvite, listCaClients, listMyCas, revokeCa } from "./ca";
 export { deleteAccount } from "./account";
 
 export * from "./inputs";

@@ -7,7 +7,7 @@ import { Badge, Select, cx } from "@/components/ui";
 type UploadAction = (input: RequestUploadInput) => Promise<{ ok: true; upload: { documentId: string; uploadUrl: string } } | { ok: false; error: string }>;
 type ConfirmAction = (documentId: string) => Promise<{ ok: true } | { ok: false; error: string }>;
 
-type Hint = "" | "invoice" | "statement" | "fira" | "noc";
+type Hint = "" | "invoice" | "statement" | "fira" | "noc" | "ack";
 type Item = { key: string; name: string; state: "uploading" | "reading" | "done" | "error"; message?: string };
 
 const MIME_BY_EXT: Record<string, string> = {

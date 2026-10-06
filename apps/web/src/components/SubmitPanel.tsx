@@ -20,7 +20,7 @@ export function SubmitPanel({ packId, month, requestUploadAction, confirmUploadA
       <div>
         <p className="text-sm font-medium">Bank acknowledgement (optional)</p>
         <p className="mb-2 text-xs text-muted">If your bank gave you a receipt or acknowledgement, add it so you have it with the pack.</p>
-        <UploadPanel month={month} showHint={false} compact requestUploadAction={requestUploadAction} confirmUploadAction={confirmUploadAction} onUploaded={setAck} />
+        <UploadPanel month={month} showHint={false} defaultHint="ack" compact requestUploadAction={requestUploadAction} confirmUploadAction={confirmUploadAction} onUploaded={setAck} />
       </div>
       {error && <Alert tone="danger">{error}</Alert>}
       <Button disabled={pending} onClick={() => { setError(null); start(async () => { const r = await markSubmitted(packId, ack); if (r.ok) router.refresh(); else setError(r.error); }); }}>

@@ -1,8 +1,24 @@
 import "server-only";
 import { resolve } from "node:path";
-import { createConsoleMailer, createDeps, type Deps } from "@korra/backend";
+import { createConsoleMailer, createDeps, type Deps, type MailMessage, type Mailer } from "@korra/backend";
 
-const g = globalThis as unknown as { __korraDeps?: Promise<Deps> };
+const g = globalThis as unknown as { __korraDeps?: Promise<Deps>; __korraDevMail?: MailMessage[] };
+
+/** Mails sent in dev in-memory mode (also printed to the console). Read by /api/dev-mail. */
+export const devMail = (): MailMessage[] => (g.__korraDevMail ??= []);
+
+/** Console-logs every mail and records the last 50 so the e2e test can read verification links. */
+function createRecordingMailer(): Mailer {
+  const log = createConsoleMailer();
+  return {
+    async send(msg) {
+      await log.send(msg);
+      const sent = devMail();
+      sent.push(msg);
+      if (sent.length > 50) sent.shift();
+    },
+  };
+}
 
 /** Dev-only in-memory mode: PGlite + memory blobs + console mailer. Never in production. */
 export const isDevInMemory = () => process.env.KORRA_DEV_INMEMORY === "1" && process.env.NODE_ENV !== "production";
@@ -33,5 +49,5 @@ async function createDevDeps(): Promise<Deps> {
       contractRef: f<string>(null, 0), serviceDescription: f("Software development services"), sacCode: f("998314", 0.6),
     }],
   };
-  return { ...deps, clock: () => new Date(), mailer: createConsoleMailer(), appUrl: base, authUrl: base };
+  return { ...deps, clock: () => new Date(), mailer: createRecordingMailer(), appUrl: base, authUrl: base };
 }

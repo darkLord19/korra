@@ -2,7 +2,7 @@ import type { DocumentWire } from "@korra/backend/schemas";
 import { Badge, Card, CardBody, CardHeader } from "@/components/ui";
 import { AutoRefresh } from "./AutoRefresh";
 
-const KIND: Record<string, string> = { invoice: "Invoice", statement: "Statement", fira: "FIRA", noc: "NOC", unknown: "Unrecognised" };
+const KIND: Record<string, string> = { invoice: "Invoice", statement: "Statement", fira: "FIRA", noc: "NOC", ack: "Bank acknowledgement", unknown: "Unrecognised" };
 
 export function DocumentsSection({ documents }: { documents: DocumentWire[] }) {
   const pending = documents.some((d) => d.status === "uploaded" || d.status === "ingesting");
@@ -23,7 +23,7 @@ export function DocumentsSection({ documents }: { documents: DocumentWire[] }) {
                 </div>
                 <div className="flex items-center gap-2">
                   {d.kind && <Badge>{KIND[d.kind]}</Badge>}
-                  {d.status === "ingested" && <Badge tone="ok">Read</Badge>}
+                  {d.status === "ingested" && d.kind !== "ack" && <Badge tone="ok">Read</Badge>}
                   {(d.status === "uploaded" || d.status === "ingesting") && <Badge tone="accent">Reading...</Badge>}
                   {d.status === "failed" && <Badge tone="danger">Could not read</Badge>}
                 </div>

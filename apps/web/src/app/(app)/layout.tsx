@@ -2,7 +2,8 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { Footer } from "@/components/Footer";
 import { SignOutButton } from "@/components/SignOutButton";
-import { currentUser } from "@/server/ctx";
+import { listCaClients } from "@korra/backend";
+import { currentUser, ownerCtx } from "@/server/ctx";
 import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
@@ -13,10 +14,12 @@ const NAV = [
   { href: "/settings", label: "Settings" },
 ];
 
-/** App shell. Stage 3b pages (tracker, settings, ca) live under this group and inherit it. */
+/** App shell. "Clients" shows only for people who are somebody's CA. */
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const user = await currentUser();
   if (!user) redirect("/sign-in");
+  const isCa = (await listCaClients(await ownerCtx())).length > 0;
+  const nav = isCa ? [...NAV, { href: "/ca", label: "Clients" }] : NAV;
   return (
     <div className="flex min-h-screen flex-col">
       <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded focus:bg-surface focus:px-3 focus:py-2">Skip to content</a>
@@ -24,7 +27,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
           <Link href="/" className="font-serif text-xl font-semibold tracking-tight">Korra</Link>
           <nav aria-label="Main" className="flex gap-1 text-sm">
-            {NAV.map((n) => (
+            {nav.map((n) => (
               <Link key={n.href} href={n.href} className="rounded-md px-3 py-1.5 hover:bg-accent-soft">{n.label}</Link>
             ))}
           </nav>

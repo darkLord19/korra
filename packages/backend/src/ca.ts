@@ -1,8 +1,8 @@
 import type { Ctx } from "./deps";
-import { acceptCaInviteInput, inviteCaInput, revokeCaInput } from "./inputs";
+import { acceptCaInviteInput, getCaInviteInput, inviteCaInput, revokeCaInput } from "./inputs";
 import { parse, repos, requireOwner } from "./internal";
 import { toWire } from "./wire";
-import type { CaClientWire, CaShareWire } from "./wire-types";
+import type { CaClientWire, CaInviteWire, CaShareWire } from "./wire-types";
 
 const shareWire = (s: { id: string; caEmail: string; status: CaShareWire["status"]; createdAt: Date; acceptedAt: Date | null }): CaShareWire =>
   toWire({ id: s.id, caEmail: s.caEmail, status: s.status, createdAt: s.createdAt, acceptedAt: s.acceptedAt });
@@ -29,6 +29,11 @@ export async function inviteCa(ctx: Ctx, rawEmail: string): Promise<CaShareWire>
     });
   }
   return shareWire(share);
+}
+
+/** Who sent an invite, and whether it is for the signed-in user. NotFoundError for an unknown token. */
+export async function getCaInvite(ctx: Ctx, rawToken: string): Promise<CaInviteWire> {
+  return repos(ctx).shares.peek(parse(getCaInviteInput, rawToken));
 }
 
 /** The caller is the invited CA, signed in as themselves. Sends nothing. */

@@ -24,12 +24,14 @@ export async function requestUploadAction(input: RequestUploadInput): Promise<Re
   }
 }
 
-/** After the browser's PUT: mark the document ingesting and run the ingest job after the response. */
+/** After the browser's PUT: mark the document ingesting and run the ingest job after the response (not for acknowledgements). */
 export async function confirmUploadAction(documentId: string): Promise<Result> {
   try {
-    const { documentId: id } = await confirmUpload(await ownerCtx(), documentId);
-    const deps = await getDeps();
-    after(() => runIngest(deps, id));
+    const { documentId: id, ingest } = await confirmUpload(await ownerCtx(), documentId);
+    if (ingest) {
+      const deps = await getDeps();
+      after(() => runIngest(deps, id));
+    }
     return { ok: true };
   } catch (e) {
     return fail(e);

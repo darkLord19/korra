@@ -15,14 +15,14 @@ const REQUIRED: readonly string[] = REQUIRED_FIELDS.invoice;
 
 export const invoiceAnchor = (id: string, field: string) => `inv-${id}-${field}`;
 
-export function InvoicesSection({ invoices, banks, realisations, save }: {
-  invoices: InvoiceWire[]; banks: AdBankWire[]; realisations: Record<string, RealisationWire>; save: SaveAction;
+export function InvoicesSection({ invoices, banks, realisations, save, readOnly = false }: {
+  invoices: InvoiceWire[]; banks: AdBankWire[]; realisations: Record<string, RealisationWire>; save?: SaveAction | undefined; readOnly?: boolean;
 }) {
   return (
     <Card aria-labelledby="invoices-h" id="invoices">
-      <CardHeader id="invoices-h" title="Invoices" description="What Korra read from your invoices. Fields it is unsure about are marked. Select any value to change it." />
+      <CardHeader id="invoices-h" title="Invoices" description={readOnly ? "What Korra read from the invoices. Fields it was unsure about are marked." : "What Korra read from your invoices. Fields it is unsure about are marked. Select any value to change it."} />
       <CardBody className="space-y-6">
-        {invoices.length === 0 && <p className="text-sm text-muted">No invoices for this month yet. Upload an invoice above.</p>}
+        {invoices.length === 0 && <p className="text-sm text-muted">{readOnly ? "No invoices for this month." : "No invoices for this month yet. Upload an invoice above."}</p>}
         {invoices.map((inv) => {
           const flagged = FIELDS.filter((f) => needsCheck(inv[f.name] as never)).length;
           const r = realisations[inv.id];
@@ -40,7 +40,7 @@ export function InvoicesSection({ invoices, banks, realisations, save }: {
                   <div key={f.name} className="grid gap-1 px-4 py-2 sm:grid-cols-[12rem_1fr]">
                     <dt className="text-muted">{FIELD_LABELS[f.name]}</dt>
                     <dd>
-                      <EditableCell entity="invoice" id={inv.id} field={f.name} kind={f.kind} data={inv[f.name] as never} banks={banks} save={save}
+                      <EditableCell entity="invoice" id={inv.id} field={f.name} kind={f.kind} data={inv[f.name] as never} banks={banks} save={save} readOnly={readOnly}
                         anchor={invoiceAnchor(inv.id, f.name)} label={FIELD_LABELS[f.name]!} required={REQUIRED.includes(f.name)} />
                     </dd>
                   </div>

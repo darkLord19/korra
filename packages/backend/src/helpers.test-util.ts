@@ -79,7 +79,7 @@ export async function onboard(ctx: Ctx, bankName = "Acme Test Bank") {
 export async function upload(
   deps: TestDeps,
   ctx: Ctx,
-  file: { filename: string; mimeType: string; bytes: Uint8Array; month: string; hint?: "invoice" | "statement" | "fira" | "noc" },
+  file: { filename: string; mimeType: string; bytes: Uint8Array; month: string; hint?: "invoice" | "statement" | "fira" | "noc" | "ack" },
   opts: { ingest?: boolean } = {},
 ): Promise<string> {
   const req = await requestUpload(ctx, { filename: file.filename, mimeType: file.mimeType as never, sizeBytes: file.bytes.byteLength, month: file.month, ...(file.hint ? { hint: file.hint } : {}) });

@@ -131,7 +131,7 @@ export const document = pgTable(
   {
     id: text("id").primaryKey(),
     userId: ownerId(),
-    kind: text("kind", { enum: ["invoice", "statement", "fira", "noc", "unknown"] }),
+    kind: text("kind", { enum: ["invoice", "statement", "fira", "noc", "ack", "unknown"] }),
     month: text("month"),
     filename: text("filename").notNull(),
     mimeType: text("mime_type").notNull(),

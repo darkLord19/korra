@@ -18,9 +18,9 @@ function display(kind: FieldKind, value: unknown, banks: AdBankWire[]): string {
 }
 
 /** A field value with a "Check this" marker and click-to-edit. All rules live in the backend's editField. */
-export function EditableCell({ entity, id, field, kind, data, banks, save, anchor, label, required = false }: {
+export function EditableCell({ entity, id, field, kind, data, banks, save, anchor, label, required = false, readOnly = false }: {
   entity: "invoice" | "payment"; id: string; field: string; kind: FieldKind; data: FieldData; banks: AdBankWire[];
-  save: SaveAction; anchor?: string; label: string; required?: boolean;
+  save?: SaveAction | undefined; anchor?: string; label: string; required?: boolean; readOnly?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -32,6 +32,7 @@ export function EditableCell({ entity, id, field, kind, data, banks, save, ancho
 
   function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (!save) return;
     const fd = new FormData(e.currentTarget);
     let value: unknown;
     if (kind === "money") {
@@ -50,6 +51,16 @@ export function EditableCell({ entity, id, field, kind, data, banks, save, ancho
       if (r.ok) setEditing(false);
       else setError(r.error.replace(/^[\w.]+: /, ""));
     });
+  }
+
+  if (readOnly || !save) {
+    return (
+      <div id={anchor} className="flex flex-wrap items-center gap-2">
+        <span className={cx(!text && "text-muted italic", (flagged || missing) && "rounded bg-flag-soft px-1 py-0.5")}>{text || "Not set"}</span>
+        {flagged && <Badge tone="flag">Check this</Badge>}
+        {data.source === "user" && <span className="text-xs text-muted">edited</span>}
+      </div>
+    );
   }
 
   if (!editing) {

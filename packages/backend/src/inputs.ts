@@ -48,7 +48,7 @@ export const requestUploadInput = z.object({
   /** Client-declared; re-checked against the stored blob during ingest. */
   sizeBytes: z.number().int().positive().max(MAX_UPLOAD_BYTES, "Files are limited to 20 MB"),
   month: yearMonthSchema,
-  hint: z.enum(["invoice", "statement", "fira", "noc"]).optional(),
+  hint: z.enum(["invoice", "statement", "fira", "noc", "ack"]).optional(),
 });
 export type RequestUploadInput = z.input<typeof requestUploadInput>;
 
@@ -142,6 +142,7 @@ export const markPackSubmittedInput = z.object({ packId: id, ackDocumentId: id.o
 
 export const inviteCaInput = z.string().trim().toLowerCase().pipe(z.email());
 export const acceptCaInviteInput = id;
+export const getCaInviteInput = id;
 export const revokeCaInput = id;
 
 /* ------------------------- parameterless use-cases ------------------------- */

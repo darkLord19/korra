@@ -4,7 +4,7 @@ import { createRepos } from "@korra/db";
 import {
   ForbiddenError, NotFoundError, ValidationError,
   acceptCaInvite, confirmUpload, decideAllocation, deleteAccount, editField, generatePack, getMonthState,
-  getOnboarding, getPackDownloads, getTracker, inviteCa, layoutIdFor, linkNoc, listCaClients, listMyCas,
+  getCaInvite, getOnboarding, getPackDownloads, getTracker, inviteCa, layoutIdFor, linkNoc, listCaClients, listMyCas,
   markPackSubmitted, requestUpload, revokeCa, runDailyNotifications, runIngest, saveProfile, sweepStuckIngests, toWire,
 } from "./index";
 import { caCtx, createTestDeps, createTestOwner, simulateBrowserPut, type TestDeps } from "./testing";
@@ -273,6 +273,40 @@ describe("packs", () => {
     expect((await getMonthState(o.ctx, "2026-09")).pendingDocumentIds).toEqual([pendingId]);
   });
 
+  it("acknowledgement uploads are stored, never ingested, and never pending", async () => {
+    const o = await createTestOwner(deps);
+    const bank = await onboard(o.ctx);
+    deps.fixtures["inv.pdf"] = invoiceResult();
+    await upload(deps, o.ctx, { filename: "inv.pdf", mimeType: "application/pdf", bytes: PDF, month: "2026-09" });
+    deps.fixtures["ack.pdf"] = invoiceResult({ invoiceNo: f("JUNK-1") }); // would create a junk invoice if ingested
+    const req = await requestUpload(o.ctx, { filename: "ack.pdf", mimeType: "application/pdf", sizeBytes: PDF.length, month: "2026-09", hint: "ack" });
+    simulateBrowserPut(deps.blobs, { url: req.uploadUrl, token: req.token }, PDF);
+    expect(await confirmUpload(o.ctx, req.documentId)).toEqual({ documentId: req.documentId, ingest: false });
+    await runIngest(deps, req.documentId); // a no-op for ack documents
+    const state = await getMonthState(o.ctx, "2026-09");
+    expect(state.documents.find((d) => d.id === req.documentId)).toMatchObject({ kind: "ack", status: "ingested", attempts: 0 });
+    expect(state.invoices).toHaveLength(1);
+    expect(state.pendingDocumentIds).toEqual([]);
+
+    const res = await generatePack(o.ctx, { month: "2026-09", adBankId: bank.id });
+    if (!res.ok) throw new Error("expected ok");
+    const pack = await markPackSubmitted(o.ctx, { packId: res.packId, ackDocumentId: req.documentId });
+    expect(pack.status).toBe("submitted");
+  });
+
+  it("markPackSubmitted only accepts the user's own acknowledgement document", async () => {
+    const o = await createTestOwner(deps);
+    const other = await createTestOwner(deps, "other@example.test");
+    const bank = await onboard(o.ctx);
+    deps.fixtures["inv.pdf"] = invoiceResult();
+    const invDoc = await upload(deps, o.ctx, { filename: "inv.pdf", mimeType: "application/pdf", bytes: PDF, month: "2026-09" });
+    const otherAck = await upload(deps, other.ctx, { filename: "ack.pdf", mimeType: "application/pdf", bytes: PDF, month: "2026-09", hint: "ack" });
+    const res = await generatePack(o.ctx, { month: "2026-09", adBankId: bank.id });
+    if (!res.ok) throw new Error("expected ok");
+    await expect(markPackSubmitted(o.ctx, { packId: res.packId, ackDocumentId: invDoc })).rejects.toBeInstanceOf(ValidationError);
+    await expect(markPackSubmitted(o.ctx, { packId: res.packId, ackDocumentId: otherAck })).rejects.toBeInstanceOf(NotFoundError);
+  });
+
   it("markPackSubmitted stops the EDF reminder", async () => {
     const o = await createTestOwner(deps);
     const bank = await onboard(o.ctx);
@@ -359,6 +393,10 @@ describe("CA sharing", () => {
 
     const cx = caCtx(deps, ca.id, owner.id);
     await expect(getMonthState(cx, "2026-09")).rejects.toBeInstanceOf(NotFoundError); // not accepted yet
+    expect(await getCaInvite(ca.ctx, token)).toMatchObject({ ownerUserId: owner.id, caEmail: "ca@firm.test", status: "invited", emailMatches: true, isOwner: false });
+    expect(await getCaInvite(stranger.ctx, token)).toMatchObject({ emailMatches: false });
+    expect(await getCaInvite(owner.ctx, token)).toMatchObject({ isOwner: true });
+    await expect(getCaInvite(ca.ctx, "no-such-token")).rejects.toBeInstanceOf(NotFoundError);
     await expect(acceptCaInvite(stranger.ctx, token)).rejects.toBeInstanceOf(NotFoundError);
     expect(await acceptCaInvite(ca.ctx, token)).toMatchObject({ ownerUserId: owner.id });
     expect(await listCaClients(ca.ctx)).toHaveLength(1);

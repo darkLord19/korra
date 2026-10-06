@@ -30,21 +30,27 @@ export async function requestUpload(ctx: Ctx, raw: RequestUploadInput): Promise<
 
 /**
  * Verifies the browser's PUT landed, then marks the document `ingesting`. The caller (a server
- * action) then runs `after(() => runIngest(deps, documentId))`.
+ * action) then runs `after(() => runIngest(deps, documentId))` when `ingest` is true.
+ * Acknowledgement documents (hint "ack") are stored only: they go straight to `ingested`, never through
+ * ingest, so `ingest` is false for them.
  */
-export async function confirmUpload(ctx: Ctx, rawId: string): Promise<{ documentId: string }> {
+export async function confirmUpload(ctx: Ctx, rawId: string): Promise<{ documentId: string; ingest: boolean }> {
   requireOwner(ctx);
   const documentId = parse(confirmUploadInput, rawId);
   const r = repos(ctx);
   const doc = await r.documents.get(documentId);
-  if (doc.status !== "uploaded") return { documentId }; // already confirmed: do not count another attempt
+  if (doc.status !== "uploaded") return { documentId, ingest: doc.status === "ingesting" && doc.kind !== "ack" }; // already confirmed: do not count another attempt
   try {
     await ctx.deps.blobs.createDownloadUrl(doc.blobKey, 60); // existence check without downloading
   } catch {
     throw new ValidationError("The file has not finished uploading. Try again.");
   }
+  if (doc.kind === "ack") {
+    await r.documents.setStatus(documentId, "ingested");
+    return { documentId, ingest: false };
+  }
   await r.documents.setStatus(documentId, "ingesting");
-  return { documentId };
+  return { documentId, ingest: true };
 }
 
 export async function listDocuments(ctx: Ctx, month?: string): Promise<DocumentWire[]> {
@@ -142,7 +148,7 @@ async function applyResult(deps: Deps, doc: DocumentRecord, result: IngestResult
 export async function runIngest(deps: Deps, rawId: string): Promise<void> {
   const documentId = parse(runIngestInput, rawId);
   const doc = await getDocumentForSystem(deps.db, documentId);
-  if (!doc || doc.status !== "ingesting") return;
+  if (!doc || doc.status !== "ingesting" || doc.kind === "ack") return;
   const r = reposFor(deps, { userId: doc.userId, role: "owner" });
   const fail = (message: string) => r.documents.setStatus(doc.id, "failed", message);
 

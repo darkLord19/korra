@@ -8,7 +8,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "typecheck": "next typegen && tsc -p tsconfig.json"
+    "typecheck": "next typegen && tsc -p tsconfig.json",
+    "e2e": "playwright test"
   },
   "dependencies": {
     "@korra/backend": "workspace:*",
@@ -20,6 +21,7 @@
   },
   "devDependencies": {
     "@korra/config": "workspace:*",
+    "@playwright/test": "1.63.0",
     "@tailwindcss/postcss": "^4.3.3",
     "@types/node": "^22.20.5",
     "@types/react": "^19.3.0",

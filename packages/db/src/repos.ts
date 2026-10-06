@@ -572,6 +572,21 @@ export function createRepos(db: Db, actor: Actor, opts: RepoOptions = {}) {
         .returning();
       return row!;
     },
+    /** Read-only look at an invite by its secret token, for the accept page. NotFoundError for an unknown token. */
+    async peek(token: string): Promise<{ ownerUserId: string; ownerName: string; caEmail: string; status: "invited" | "accepted" | "revoked"; emailMatches: boolean; isOwner: boolean }> {
+      if (actor.role !== "owner") throw new ForbiddenError();
+      const me = one(await db.select({ email: s.user.email }).from(s.user).where(eq(s.user.id, actor.userId)));
+      const share = one(await db.select().from(s.caShare).where(eq(s.caShare.token, token)));
+      const owner = one(await db.select({ name: s.user.name }).from(s.user).where(eq(s.user.id, share.ownerUserId)));
+      return {
+        ownerUserId: share.ownerUserId,
+        ownerName: owner.name,
+        caEmail: share.caEmail,
+        status: share.status,
+        emailMatches: share.caEmail === me.email.toLowerCase(),
+        isOwner: share.ownerUserId === actor.userId,
+      };
+    },
     /** Clients (owners) who have an accepted share with this user. */
     async listForCa(): Promise<{ shareId: string; ownerUserId: string; ownerName: string; ownerEmail: string; acceptedAt: Date | null }[]> {
       const rows = await db

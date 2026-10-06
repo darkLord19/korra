@@ -2,7 +2,7 @@ import { assessPack } from "@korra/core";
 import { newId } from "@korra/db";
 import { listLayouts, renderPack } from "@korra/packs";
 import type { Ctx } from "./deps";
-import { NotFoundError } from "./errors";
+import { NotFoundError, ValidationError } from "./errors";
 import { generatePackInput, getPackDownloadsInput, markPackSubmittedInput } from "./inputs";
 import { packWire, parse, repos, requireOwner } from "./internal";
 import { draftFor, loadMonth } from "./month";
@@ -98,5 +98,10 @@ export async function getPackDownloads(ctx: Ctx, rawId: string): Promise<PackDow
 export async function markPackSubmitted(ctx: Ctx, raw: { packId: string; ackDocumentId?: string }): Promise<PackWire> {
   requireOwner(ctx);
   const input = parse(markPackSubmittedInput, raw);
-  return packWire(await repos(ctx).packs.markSubmitted(input.packId, input.ackDocumentId));
+  const r = repos(ctx);
+  if (input.ackDocumentId) {
+    const ack = await r.documents.get(input.ackDocumentId); // NotFoundError unless it is this user's
+    if (ack.kind !== "ack") throw new ValidationError("That file is not a bank acknowledgement.");
+  }
+  return packWire(await r.packs.markSubmitted(input.packId, input.ackDocumentId));
 }

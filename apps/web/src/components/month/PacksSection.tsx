@@ -22,25 +22,26 @@ function describe(b: BlockerWire, invoices: InvoiceWire[]): { text: string; href
   }
 }
 
-export function PacksSection({ month, blockersByBank, invoices, packs, placeholderBankIds, generate }: {
+export function PacksSection({ month, blockersByBank, invoices, packs, placeholderBankIds, generate, readOnly = false, packHref = (id) => `/packs/${id}` }: {
   month: string;
   blockersByBank: { adBankId: string; adBankName: string; blockers: BlockerWire[] }[];
-  invoices: InvoiceWire[]; packs: PackWire[]; placeholderBankIds: string[]; generate: Generate;
+  invoices: InvoiceWire[]; packs: PackWire[]; placeholderBankIds: string[]; generate?: Generate | undefined;
+  readOnly?: boolean; packHref?: (packId: string) => string;
 }) {
   return (
     <Card aria-labelledby="packs-h" id="packs">
-      <CardHeader id="packs-h" title="EDF packs" description={`One pack per AD bank. EDFs for ${monthLabel(month)} are due by ${dateLabel(edfDueDate(month))}.`} />
+      <CardHeader id="packs-h" title="EDF packs" description={`${readOnly ? "" : "One pack per AD bank. "}EDFs for ${monthLabel(month)} are due by ${dateLabel(edfDueDate(month))}.`} />
       <CardBody className="space-y-6">
-        {blockersByBank.length === 0 && <p className="text-sm text-muted">Add an AD bank in your profile to generate a pack.</p>}
+        {blockersByBank.length === 0 && <p className="text-sm text-muted">{readOnly ? "No AD banks on this account." : "Add an AD bank in your profile to generate a pack."}</p>}
         {blockersByBank.map((b) => (
           <div key={b.adBankId} className="space-y-3 rounded-md border border-line p-4">
             <h3 className="font-medium">{b.adBankName}</h3>
-            {placeholderBankIds.includes(b.adBankId) && (
+            {!readOnly && placeholderBankIds.includes(b.adBankId) && (
               <Alert tone="warning" title="Placeholder layout">
                 We do not have {b.adBankName}&rsquo;s official EDF format yet, so this pack uses a stand-in layout. Check it against your bank&rsquo;s form before submitting.
               </Alert>
             )}
-            {b.blockers.length > 0 ? (
+            {readOnly || !generate ? null : b.blockers.length > 0 ? (
               <div>
                 <p className="text-sm font-medium">Fix these before you can generate the pack:</p>
                 <ul className="mt-2 list-disc space-y-1 pl-5 text-sm">
@@ -55,10 +56,11 @@ export function PacksSection({ month, blockersByBank, invoices, packs, placehold
             )}
             {packs.filter((p) => p.adBankId === b.adBankId).map((p) => (
               <p key={p.id} className="text-sm">
-                <Link href={`/packs/${p.id}`} className="text-accent underline">Pack generated {dateLabel(p.generatedAt.slice(0, 10))}</Link>{" "}
+                <Link href={packHref(p.id)} className="text-accent underline">Pack generated {dateLabel(p.generatedAt.slice(0, 10))}</Link>{" "}
                 {p.status === "submitted" ? <Badge tone="ok">Submitted</Badge> : <Badge>Not submitted</Badge>}
               </p>
             ))}
+            {readOnly && !packs.some((p) => p.adBankId === b.adBankId) && <p className="text-sm text-muted">No pack generated yet.</p>}
           </div>
         ))}
       </CardBody>

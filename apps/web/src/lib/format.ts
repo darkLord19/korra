@@ -35,3 +35,6 @@ export const FIELD_LABELS: Record<string, string> = {
   fees: "Fees", firaRef: "FIRA reference", purposeCode: "Purpose code", payerName: "Payer", realisingBankName: "Realising bank",
   legalName: "Legal name", address: "Address", pan: "PAN", gstin: "GSTIN", defaultAdBankId: "Default AD bank",
 };
+
+/** Whole days from `from` to `to` (ISO dates); negative when `to` is earlier. */
+export const daysBetween = (from: string, to: string): number => Math.round((Date.parse(to) - Date.parse(from)) / 86_400_000);

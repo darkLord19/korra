@@ -10,9 +10,9 @@ const COLS: { name: keyof PaymentWire & string; kind: FieldKind }[] = [
   { name: "foreignAmount", kind: "money" }, { name: "inrCredited", kind: "money" }, { name: "firaRef", kind: "text" }, { name: "purposeCode", kind: "text" },
 ];
 
-export function PaymentsSection({ payments, documents, banks, save, link }: {
-  payments: PaymentWire[]; documents: DocumentWire[]; banks: AdBankWire[]; save: SaveAction;
-  link: (paymentId: string, documentId: string) => Promise<{ ok: true } | { ok: false; error: string }>;
+export function PaymentsSection({ payments, documents, banks, save, link, readOnly = false }: {
+  payments: PaymentWire[]; documents: DocumentWire[]; banks: AdBankWire[]; save?: SaveAction | undefined;
+  link?: ((paymentId: string, documentId: string) => Promise<{ ok: true } | { ok: false; error: string }>) | undefined; readOnly?: boolean;
 }) {
   const nocs = documents.filter((d) => d.kind === "noc");
   const nameOf = (id: string | null) => documents.find((d) => d.id === id)?.filename;
@@ -21,7 +21,7 @@ export function PaymentsSection({ payments, documents, banks, save, link }: {
       <CardHeader id="payments-h" title="Payments" description="Money received for your exports, read from your statement or FIRA. Payments never block an EDF pack; they are used to match invoices and track realisation." />
       <CardBody className="space-y-3 px-0">
         {payments.length === 0 ? (
-          <p className="px-5 text-sm text-muted">No payments yet. Upload your Deel transactions export or a FIRA above.</p>
+          <p className="px-5 text-sm text-muted">{readOnly ? "No payments for this month." : "No payments yet. Upload your Deel transactions export or a FIRA above."}</p>
         ) : (
           <Table>
             <thead>
@@ -36,14 +36,14 @@ export function PaymentsSection({ payments, documents, banks, save, link }: {
                 <tr key={p.id}>
                   {COLS.map((c) => (
                     <Td key={c.name} className={c.kind === "date" ? "whitespace-nowrap" : ""}>
-                      <EditableCell entity="payment" id={p.id} field={c.name} kind={c.kind} data={p[c.name] as never} banks={banks} save={save}
+                      <EditableCell entity="payment" id={p.id} field={c.name} kind={c.kind} data={p[c.name] as never} banks={banks} save={save} readOnly={readOnly}
                         anchor={`pay-${p.id}-${c.name}`} label={FIELD_LABELS[c.name]!} />
                     </Td>
                   ))}
                   <Td><Badge>{p.rail === "deel" ? "Deel" : "Other"}</Badge></Td>
                   <Td>
                     {p.nocDocumentId ? <Badge tone="ok">{nameOf(p.nocDocumentId) ?? "NOC linked"}</Badge>
-                      : nocs.length > 0 ? <NocSelect paymentId={p.id} options={nocs} link={link} /> : <span className="text-xs text-muted">None</span>}
+                      : nocs.length > 0 && !readOnly && link ? <NocSelect paymentId={p.id} options={nocs} link={link} /> : <span className="text-xs text-muted">None</span>}
                   </Td>
                 </tr>
               ))}

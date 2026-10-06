@@ -2,13 +2,13 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getOnboarding } from "@korra/backend";
 import { Footer } from "@/components/Footer";
-import { buttonClass } from "@/components/ui";
+import { Alert, buttonClass } from "@/components/ui";
 import { currentMonthIST } from "@/lib/format";
 import { currentUser, ownerCtx } from "@/server/ctx";
 
 export const dynamic = "force-dynamic";
 
-export default async function Home() {
+export default async function Home({ searchParams }: { searchParams: Promise<{ deleted?: string }> }) {
   if (await currentUser()) {
     const ob = await getOnboarding(await ownerCtx());
     redirect(ob.complete ? `/months/${currentMonthIST()}` : "/onboarding");
@@ -20,6 +20,9 @@ export default async function Home() {
         <Link href="/sign-in" className="text-sm text-accent underline">Sign in</Link>
       </header>
       <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-10">
+        {(await searchParams).deleted === "1" && (
+          <div className="mb-8"><Alert tone="success" title="Your account has been deleted">Your profile, invoices, payments, packs and uploaded files have been removed from Korra.</Alert></div>
+        )}
         <h1 className="max-w-2xl text-4xl leading-tight font-semibold sm:text-5xl">Your export declaration forms, ready for the bank.</h1>
         <p className="mt-5 max-w-xl text-lg text-muted">
           If you invoice foreign clients as a freelancer or agency in India, your AD bank needs an Export Declaration Form (EDF) for each month&rsquo;s invoices.

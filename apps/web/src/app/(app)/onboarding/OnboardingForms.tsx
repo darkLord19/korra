@@ -22,8 +22,12 @@ export function AddBankForm() {
   );
 }
 
-export function ProfileForm({ profile, banks }: { profile: ExporterProfileWire | null; banks: AdBankWire[] }) {
-  const [state, action, pending] = useActionState(saveProfileAction, empty);
+export function ProfileForm({ profile, banks, action: submit = saveProfileAction, submitLabel = "Save and continue" }: {
+  profile: ExporterProfileWire | null; banks: AdBankWire[];
+  /** Defaults to onboarding's action (saves, then goes to the app). Settings passes one that stays put. */
+  action?: (prev: FormState, data: FormData) => Promise<FormState>; submitLabel?: string;
+}) {
+  const [state, action, pending] = useActionState(submit, empty);
   const fe = state.fieldErrors ?? {};
   const p = profile;
   const v = (k: string, fallback?: string | null) => state.values?.[k] ?? fallback ?? "";
@@ -50,7 +54,8 @@ export function ProfileForm({ profile, banks }: { profile: ExporterProfileWire |
         </Select>
       </Field>
       {state.error && !state.fieldErrors && <Alert tone="danger">{state.error}</Alert>}
-      <Button type="submit" disabled={pending || banks.length === 0}>{pending ? "Saving..." : "Save and continue"}</Button>
+      <Button type="submit" disabled={pending || banks.length === 0}>{pending ? "Saving..." : submitLabel}</Button>
+      {state.ok && <Alert tone="success">Saved.</Alert>}
     </form>
   );
 }

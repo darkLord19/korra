@@ -5,7 +5,7 @@ import { MatchButtons } from "./MatchButtons";
 
 type Decide = (invoiceId: string, paymentId: string, decision: "confirm" | "reject") => Promise<{ ok: true } | { ok: false; error: string }>;
 
-export function MatchesSection({ allocations, invoices, payments, decide }: { allocations: AllocationWire[]; invoices: InvoiceWire[]; payments: PaymentWire[]; decide: Decide }) {
+export function MatchesSection({ allocations, invoices, payments, decide, readOnly = false }: { allocations: AllocationWire[]; invoices: InvoiceWire[]; payments: PaymentWire[]; decide?: Decide | undefined; readOnly?: boolean }) {
   const proposed = allocations.filter((a) => a.status === "proposed");
   const confirmed = allocations.filter((a) => a.status === "confirmed");
   const inv = (id: string) => invoices.find((i) => i.id === id);
@@ -18,13 +18,13 @@ export function MatchesSection({ allocations, invoices, payments, decide }: { al
           <p><span className="font-medium">Invoice {i?.invoiceNo.value ?? "(other month)"}</span> and payment of {money(p?.foreignAmount.value) || "unknown amount"}{p?.date.value ? ` on ${dateLabel(p.date.value)}` : ""}{p?.payerName.value ? ` from ${p.payerName.value}` : ""}</p>
           <p className="text-xs text-muted">Allocates {money(a.amount)}{a.status === "proposed" ? `; match score ${Math.round(a.score * 100)}%` : ""}</p>
         </div>
-        <MatchButtons invoiceId={a.invoiceId} paymentId={a.paymentId} status={a.status as "proposed" | "confirmed"} decide={decide} />
+        {!readOnly && decide && <MatchButtons invoiceId={a.invoiceId} paymentId={a.paymentId} status={a.status as "proposed" | "confirmed"} decide={decide} />}
       </li>
     );
   };
   return (
     <Card aria-labelledby="matches-h" id="matches">
-      <CardHeader id="matches-h" title="Matches" description="Korra suggests which payment settles which invoice. Confirm the ones that are right; confirmed matches count towards realisation." />
+      <CardHeader id="matches-h" title="Matches" description={readOnly ? "Which payment settles which invoice. Only confirmed matches count towards realisation." : "Korra suggests which payment settles which invoice. Confirm the ones that are right; confirmed matches count towards realisation."} />
       <CardBody className="space-y-5 px-0">
         <div>
           <h3 className="px-5 pb-2 text-sm font-medium">To review ({proposed.length})</h3>
