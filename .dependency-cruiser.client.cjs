@@ -1,7 +1,7 @@
 /**
  * Second dependency-cruiser pass: client-bundle boundary (design doc section 3).
  *
- * Any file under apps/web with a "use client" directive, and anything it transitively imports,
+ * Any file under apps/web or packages/ui with a "use client" directive, and anything it transitively imports,
  * must not reach @korra/backend, db, ingest or packs. `import type` is allowed: this pass
  * runs with tsPreCompilationDeps=false, so type-only imports are erased from the graph.
  * "use server" files are excluded from the graph: the bundler turns them into RPC stubs, so a
@@ -33,7 +33,7 @@ module.exports = {
     exclude: {
       // apps/spike-local is the client-only v0 spike: its "use client" modules deliberately import the
       // isomorphic entries (db, backend, db/browser, ...) to run the use-cases in the browser.
-      path: `(^|/)(\\.next|\\.turbo|node_modules)/|\\.test\\.ts$|^packages/config/|^apps/spike-local/|${serverActionFiles}`,
+      path: `(^|/)(\\.next|\\.turbo|node_modules)/|\\.test\\.tsx?$|^packages/ui/src/test-(utils|setup)\\.tsx?$|^packages/config/|^apps/spike-local/|${serverActionFiles}`,
     },
     tsPreCompilationDeps: false,
     enhancedResolveOptions: {

@@ -1,31 +1,11 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import { deleteAccount, inviteCa, revokeCa, saveBank, saveProfile } from "@korra/backend";
+import { deleteAccount, inviteCa, revokeCa } from "@korra/backend";
 import { ownerCtx } from "@/server/ctx";
 import { toFormState, type FormState } from "@/server/errors";
-import { formValues, profileFromForm } from "@/server/forms";
+import { formValues } from "@/server/forms";
 
 const str = (d: FormData, k: string) => String(d.get(k) ?? "");
-
-export async function updateBankAction(_prev: FormState, data: FormData): Promise<FormState> {
-  try {
-    await saveBank(await ownerCtx(), { id: str(data, "id"), name: str(data, "name"), adCode: str(data, "adCode") });
-  } catch (e) {
-    return toFormState(e);
-  }
-  revalidatePath("/", "layout");
-  return { ok: true };
-}
-
-export async function saveProfileSettingsAction(_prev: FormState, data: FormData): Promise<FormState> {
-  try {
-    await saveProfile(await ownerCtx(), profileFromForm(data));
-  } catch (e) {
-    return { ...toFormState(e), values: formValues(data) };
-  }
-  revalidatePath("/settings");
-  return { ok: true };
-}
 
 export async function inviteCaAction(_prev: FormState, data: FormData): Promise<FormState> {
   try {

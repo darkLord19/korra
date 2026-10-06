@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { listCaClients } from "@korra/backend";
-import { Card, CardBody, CardHeader, buttonClass } from "@/components/ui";
-import { currentMonthIST, dateLabel } from "@/lib/format";
+import { Card, CardBody, CardHeader, buttonClass, currentMonthIST, dateLabel } from "@korra/ui";
 import { ownerCtx } from "@/server/ctx";
 
 export const dynamic = "force-dynamic";

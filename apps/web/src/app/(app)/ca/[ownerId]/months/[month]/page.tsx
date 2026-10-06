@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { getMonthState, getOnboarding, listPacks, yearMonthSchema } from "@korra/backend";
-import { MonthView } from "@/components/month/MonthView";
+import { MonthView } from "@korra/ui";
 import { caCtx } from "@/server/ctx";
 import { notFoundOrThrow } from "@/server/errors";
 
@@ -12,5 +12,5 @@ export default async function ClientMonthPage({ params }: { params: Promise<{ ow
   if (!yearMonthSchema.safeParse(month).success) notFound();
   const ctx = await caCtx(ownerId);
   const [onboarding, state, packs] = await Promise.all([getOnboarding(ctx), getMonthState(ctx, month), listPacks(ctx, month)]).catch(notFoundOrThrow);
-  return <MonthView month={month} state={state} banks={onboarding.banks} packs={packs} readOnly base={`/ca/${ownerId}`} />;
+  return <MonthView month={month} state={state} banks={onboarding.banks} packs={packs} readOnly />;
 }

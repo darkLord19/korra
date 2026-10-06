@@ -14,6 +14,7 @@ import {
 } from "./inputs";
 import { documentWire, parse, rematch, repos, requireOwner, todayOf } from "./internal";
 import { blockersByBank, loadMonth } from "./month";
+import { isPlaceholderLayout, layoutIdFor } from "./packs";
 import { toWire } from "./wire";
 import type { AllocationWire, InvoiceWire, MonthStateWire, PaymentWire, Wire } from "./wire-types";
 
@@ -41,7 +42,7 @@ export async function getMonthState(ctx: Ctx, rawMonth: string): Promise<MonthSt
     payments: payments.map((p): PaymentWire => ({ ...toWire(p), documentId: links[p.id]?.documentId ?? null, nocDocumentId: links[p.id]?.nocDocumentId ?? null })),
     allocations: toWire(allocations),
     realisations,
-    blockersByBank: blockersByBank(m, ctx.deps.clock()),
+    blockersByBank: blockersByBank(m, ctx.deps.clock()).map((b) => ({ ...b, placeholderLayout: isPlaceholderLayout(layoutIdFor(b.adBankName)) })),
     pendingDocumentIds: m.pendingDocumentIds,
   };
 }

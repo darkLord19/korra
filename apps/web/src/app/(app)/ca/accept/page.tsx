@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { getCaInvite, NotFoundError, type CaInviteWire } from "@korra/backend";
 import { SignOutButton } from "@/components/SignOutButton";
-import { Alert, Card, CardBody, CardHeader, buttonClass } from "@/components/ui";
+import { Alert, Card, CardBody, CardHeader, buttonClass } from "@korra/ui";
 import { currentUser, ownerCtx } from "@/server/ctx";
 import { AcceptForm } from "./AcceptForm";
 

@@ -3,7 +3,7 @@ import { useState, type FormEvent, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
-import { Alert, Button, Field, Input } from "@/components/ui";
+import { Alert, Button, Field, Input } from "@korra/ui";
 
 type Result = { error?: { message?: string; code?: string } | null };
 

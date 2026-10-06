@@ -1,7 +1,7 @@
 "use client";
 import { useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
-import { Button } from "@/components/ui";
+import { Button } from "@korra/ui";
 
 export function SignOutButton() {
   const router = useRouter();

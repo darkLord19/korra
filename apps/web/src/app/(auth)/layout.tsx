@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { Footer } from "@/components/Footer";
+import { Footer } from "@korra/ui";
 
 export default function AuthLayout({ children }: { children: ReactNode }) {
   return (

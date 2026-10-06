@@ -78,7 +78,8 @@ export interface MonthStateWire {
   allocations: AllocationWire[];
   /** By invoice id. Only invoices that have a date and an amount. */
   realisations: Record<string, RealisationWire>;
-  blockersByBank: { adBankId: string; adBankName: string; blockers: BlockerWire[] }[];
+  /** `placeholderLayout`: the bank has no official EDF format yet, so its pack uses a stand-in layout. */
+  blockersByBank: { adBankId: string; adBankName: string; blockers: BlockerWire[]; placeholderLayout: boolean }[];
   pendingDocumentIds: string[];
 }
 

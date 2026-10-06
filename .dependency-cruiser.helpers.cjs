@@ -12,10 +12,10 @@ function listSources(dir) {
   });
 }
 
-/** Files under apps/web whose first statement is the given directive. */
+/** Files under apps/web and packages/ui whose first statement is the given directive. */
 function filesWithDirective(directive) {
   const re = new RegExp(`^\\s*(?:(?://[^\\n]*\\n|/\\*[\\s\\S]*?\\*/)\\s*)*["']${directive}["']`);
-  return listSources("apps/web/src").filter((f) => re.test(fs.readFileSync(f, "utf8")));
+  return [...listSources("apps/web/src"), ...listSources("packages/ui/src")].filter((f) => re.test(fs.readFileSync(f, "utf8")));
 }
 
 /** Regex matching exactly the given files; matches nothing when the list is empty. */

@@ -2,8 +2,8 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { listCaClients } from "@korra/backend";
-import { Alert } from "@/components/ui";
-import { currentMonthIST } from "@/lib/format";
+import { Alert, currentMonthIST } from "@korra/ui";
+import { ClientNav } from "@/client/WebProviders";
 import { ownerCtx } from "@/server/ctx";
 
 export const dynamic = "force-dynamic";
@@ -24,7 +24,7 @@ export default async function ClientLayout({ children, params }: { children: Rea
           <Link href="/ca" className="text-accent underline">All clients</Link>
         </p>
       </Alert>
-      {children}
+      <ClientNav ownerId={ownerId}>{children}</ClientNav>
     </div>
   );
 }

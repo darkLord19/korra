@@ -1,43 +1,13 @@
 "use client";
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import type { AdBankWire, CaShareWire } from "@korra/backend/schemas";
-import { Alert, Badge, Button, Field, Input } from "@/components/ui";
+import type { CaShareWire } from "@korra/backend/schemas";
+import { Alert, Badge, Button, Field, Input, dateLabel } from "@korra/ui";
 import { authClient } from "@/lib/auth-client";
 import type { FormState } from "@/lib/form-state";
-import { dateLabel } from "@/lib/format";
-import { deleteAccountAction, inviteCaAction, revokeCaAction, updateBankAction } from "./actions";
+import { deleteAccountAction, inviteCaAction, revokeCaAction } from "./actions";
 
 const empty: FormState = {};
-
-export function BankRow({ bank, isDefault }: { bank: AdBankWire; isDefault: boolean }) {
-  const [editing, setEditing] = useState(false);
-  const [state, action, pending] = useActionState(updateBankAction, empty);
-  useEffect(() => { if (state.ok) setEditing(false); }, [state]);
-  const fe = state.fieldErrors ?? {};
-  if (!editing) {
-    return (
-      <li className="flex flex-wrap items-center justify-between gap-3 px-3 py-2">
-        <span className="flex flex-wrap items-center gap-2">{bank.name} <span className="text-muted">AD code {bank.adCode}</span>{isDefault && <Badge tone="accent">Default</Badge>}</span>
-        <Button size="sm" variant="ghost" onClick={() => setEditing(true)} aria-label={`Edit ${bank.name}`}>Edit</Button>
-      </li>
-    );
-  }
-  return (
-    <li className="px-3 py-3">
-      <form action={action} className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-start">
-        <input type="hidden" name="id" value={bank.id} />
-        <Field id={`bn-${bank.id}`} label="Bank name" error={fe.name}><Input id={`bn-${bank.id}`} name="name" defaultValue={bank.name} required autoFocus /></Field>
-        <Field id={`ba-${bank.id}`} label="AD code" error={fe.adCode}><Input id={`ba-${bank.id}`} name="adCode" defaultValue={bank.adCode} required /></Field>
-        <div className="flex gap-2 sm:pt-[1.65rem]">
-          <Button type="submit" size="sm" disabled={pending}>{pending ? "Saving..." : "Save"}</Button>
-          <Button size="sm" variant="ghost" onClick={() => setEditing(false)} disabled={pending}>Cancel</Button>
-        </div>
-        {state.error && !state.fieldErrors && <div className="sm:col-span-3"><Alert tone="danger">{state.error}</Alert></div>}
-      </form>
-    </li>
-  );
-}
 
 export function InviteCaForm() {
   const [state, action, pending] = useActionState(inviteCaAction, empty);

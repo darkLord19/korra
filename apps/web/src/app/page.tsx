@@ -1,9 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getOnboarding } from "@korra/backend";
-import { Footer } from "@/components/Footer";
-import { Alert, buttonClass } from "@/components/ui";
-import { currentMonthIST } from "@/lib/format";
+import { Alert, Footer, buttonClass, currentMonthIST } from "@korra/ui";
 import { currentUser, ownerCtx } from "@/server/ctx";
 
 export const dynamic = "force-dynamic";

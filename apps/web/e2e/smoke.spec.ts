@@ -67,13 +67,29 @@ test("sign up to EDF pack, tracker and CA invite", async ({ page, request }) => 
   await page.getByRole("button", { name: "Confirm", exact: true }).click();
   await expect(page.getByRole("heading", { name: /Confirmed \(1\)/ })).toBeVisible();
 
-  // The SAC code was read at 60% confidence: fix it.
+  // The SAC code was read at 60% confidence: "I've checked these" confirms every field in one click.
   const invoice = page.getByRole("article", { name: "Invoice INV-2026-014" });
   await expect(invoice.getByText("Check this")).toBeVisible();
+  await invoice.getByRole("button", { name: /I.ve checked these/ }).click();
+  await expect(invoice.getByText("Check this")).toHaveCount(0);
+  await expect(invoice.getByRole("button", { name: /I.ve checked these/ })).toHaveCount(0);
+
+  // Editing a value still works.
   await invoice.getByRole("button", { name: "Edit SAC code" }).click();
   await invoice.getByLabel("SAC code", { exact: true }).fill("998314");
   await invoice.getByRole("button", { name: "Save" }).click();
-  await expect(invoice.getByText("Check this")).toHaveCount(0);
+  await expect(invoice.getByRole("button", { name: "Edit SAC code" })).toContainText("998314");
+
+  // A payment typed in by hand.
+  await page.getByRole("button", { name: "Add payment by hand" }).click();
+  const payForm = page.getByRole("form", { name: "Add payment by hand" });
+  await payForm.getByLabel("Payer").fill("Hand Payer Ltd");
+  await payForm.getByLabel("Date").fill("2026-09-15");
+  await payForm.getByLabel("Foreign amount", { exact: true }).fill("250.50");
+  await payForm.getByRole("button", { name: "Save payment" }).click();
+  await expect(payForm).toHaveCount(0);
+  // Cell buttons carry aria-labels ("Edit Payer"), so the row's name omits the value: match the button text.
+  await expect(page.getByRole("button", { name: "Edit Payer" }).filter({ hasText: "Hand Payer Ltd" })).toBeVisible();
 
   // Generate the pack: four files.
   await page.getByRole("button", { name: "Generate EDF pack" }).click();

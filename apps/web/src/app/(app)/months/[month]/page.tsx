@@ -1,13 +1,9 @@
 import { notFound, redirect } from "next/navigation";
 import { after } from "next/server";
 import { getMonthState, getOnboarding, listPacks, requeueStuckIngests, runIngest, yearMonthSchema } from "@korra/backend";
-import { MonthView } from "@/components/month/MonthView";
-import { monthLabel } from "@/lib/format";
+import { MonthScreen, monthLabel } from "@korra/ui";
 import { ownerCtx } from "@/server/ctx";
 import { getDeps } from "@/server/deps";
-import {
-  confirmUploadAction, decideAllocationAction, editFieldAction, generatePackAction, linkNocAction, requestUploadAction,
-} from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -29,14 +25,5 @@ export default async function MonthPage({ params }: { params: Promise<{ month: s
     for (const id of stuck) after(() => runIngest(deps, id));
   }
   const [state, packs] = await Promise.all([getMonthState(ctx, month), listPacks(ctx, month)]);
-  return (
-    <MonthView
-      month={month} state={state} banks={onboarding.banks} packs={packs}
-      actions={{
-        requestUpload: requestUploadAction, confirmUpload: confirmUploadAction,
-        save: editFieldAction.bind(null, month), link: linkNocAction.bind(null, month),
-        decide: decideAllocationAction.bind(null, month), generate: generatePackAction,
-      }}
-    />
-  );
+  return <MonthScreen key={month} month={month} initial={{ state, banks: onboarding.banks, packs }} />;
 }

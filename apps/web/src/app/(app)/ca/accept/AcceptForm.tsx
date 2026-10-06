@@ -1,6 +1,6 @@
 "use client";
 import { useActionState } from "react";
-import { Alert, Button } from "@/components/ui";
+import { Alert, Button } from "@korra/ui";
 import type { FormState } from "@/lib/form-state";
 import { acceptInviteAction } from "./actions";
 

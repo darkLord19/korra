@@ -9,6 +9,7 @@
  * `db/browser`, `backend/browser`, `ingest/pdf`. See docs/design/v0-client-only-and-declarations.md section A2.
  *   ingest / packs / db ──► core
  *   core     ──► nothing in the workspace
+ *   ui       ──► core, backend/schemas (types + zod only); never backend main, db, ingest, packs
  */
 /** Node core modules (depcruise resolves `node:fs` to `fs`). */
 const NODE_BUILTINS = "^(fs|path|crypto|os|url|buffer|stream|zlib|http|https|net|child_process|worker_threads)$";
@@ -25,11 +26,27 @@ const edge = (name, from, to, comment) => ({
 /** @type {import('dependency-cruiser').IConfiguration} */
 module.exports = {
   forbidden: [
-    edge("core-imports-nothing", "^packages/core/", "^(packages/(ingest|packs|db|backend)/|apps/|@korra/(ingest|packs|db|backend|web)(/|$))", "core is pure domain; no workspace deps."),
+    edge("core-imports-nothing", "^packages/core/", "^(packages/(ingest|packs|db|backend|ui)/|apps/|@korra/(ingest|packs|db|backend|ui|web)(/|$))", "core is pure domain; no workspace deps."),
     edge("ingest-only-core", "^packages/ingest/", "^(packages/(packs|db|backend)/|apps/|@korra/(packs|db|backend|web)(/|$))", "ingest may import core only."),
     edge("packs-only-core", "^packages/packs/", "^(packages/(ingest|db|backend)/|apps/|@korra/(ingest|db|backend|web)(/|$))", "packs may import core only."),
     edge("db-only-core", "^packages/db/", "^(packages/(ingest|packs|backend)/|apps/|@korra/(ingest|packs|backend|web)(/|$))", "db may import core only."),
-    edge("backend-no-apps", "^packages/backend/", "^(apps/|@korra/web(/|$))", "backend must not import apps."),
+    edge("backend-no-apps", "^packages/backend/", "^(apps/|packages/ui/|@korra/(web|ui)(/|$))", "backend must not import apps or the UI package."),
+    edge(
+      "ui-only-core-and-schemas",
+      "^packages/ui/",
+      "^(packages/(ingest|packs|db)/|apps/|@korra/(ingest|packs|db|web)(/|$))",
+      "@korra/ui is isomorphic UI: it may import only @korra/core and @korra/backend/schemas (and react).",
+    ),
+    {
+      name: "ui-backend-schemas-only",
+      comment: "@korra/ui may import the backend's client-safe schemas entry (zod input schemas and wire types), never its main entry or server/browser entries.",
+      severity: "error",
+      from: { path: "^packages/ui/" },
+      to: {
+        path: "^(packages/backend/|@korra/backend(/|$))",
+        pathNot: "^(packages/backend/src/(schemas|inputs|wire-types)\\.ts|@korra/backend/schemas)$",
+      },
+    },
     edge(
       "web-no-direct-server-pkgs",
       "^apps/web/",
@@ -46,11 +63,11 @@ module.exports = {
     {
       name: "iso-entries-stay-isomorphic",
       comment:
-        "The main entries (db, ingest, packs, backend), the browser entries (db/browser, backend/browser), ingest/pdf, backend/schemas and everything under apps/local run in the browser. " +
+        "The main entries (db, ingest, packs, backend), the browser entries (db/browser, backend/browser), ingest/pdf, backend/schemas, packages/ui and everything under apps/local run in the browser. " +
         "Nothing reachable from them may be a /server entry or a server-only module (postgres, Supabase, Anthropic, Better Auth, Resend, server-only, node:*).",
       severity: "error",
       from: {
-        path: "^(packages/(db|ingest|packs|backend)/src/(index|browser|pdf|schemas)\\.ts|apps/local/)",
+        path: "^(packages/(db|ingest|packs|backend)/src/(index|browser|pdf|schemas)\\.ts|packages/ui/src/|apps/local/)",
       },
       to: {
         path: [
@@ -70,7 +87,7 @@ module.exports = {
       comment: "Browser-reachable code must not import Node built-ins (node:fs, node:crypto, ...). Use Web APIs (globalThis.crypto).",
       severity: "error",
       from: {
-        path: "^(packages/(db|ingest|packs|backend)/src/(index|browser|pdf|schemas)\\.ts|apps/local/)",
+        path: "^(packages/(db|ingest|packs|backend)/src/(index|browser|pdf|schemas)\\.ts|packages/ui/src/|apps/local/)",
       },
       to: { path: ["^node:", NODE_BUILTINS], reachable: true },
     },
@@ -85,7 +102,7 @@ module.exports = {
   // so the rules above also match the bare "@korra/x" specifier.
   options: {
     doNotFollow: { path: "node_modules" },
-    exclude: { path: "(^|/)(\\.next|\\.turbo)/|\\.test\\.ts$|^packages/config/" },
+    exclude: { path: "(^|/)(\\.next|\\.turbo)/|\\.test\\.tsx?$|^packages/ui/src/test-(utils|setup)\\.tsx?$|^packages/config/" },
     tsPreCompilationDeps: true,
     enhancedResolveOptions: {
       exportsFields: ["exports"],
