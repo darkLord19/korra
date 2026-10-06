@@ -11,3 +11,7 @@ next-env.d.ts
 .vercel/
 .DS_Store
 .pnpm-store/
+
+# agent tooling
+.claude/worktrees/
+AGENTS.md
