@@ -1,5 +1,6 @@
 // Browser boot for the client-only app: PGlite (in a worker, on IndexedDB) + the IndexedDB blob store + the real
 // backend use-cases, wired through `createLocalDeps`. Nothing here runs during prerender (it is called from an effect).
+import type { Ctx } from "@korra/backend";
 import { createLocalDeps, ensureLocalOwner } from "@korra/backend/browser";
 import { createIndexedDbBlobStore, createWorkerClient, DEFAULT_DATA_DIR, type IndexedDbBlobStore, type KorraPg } from "@korra/db/browser";
 import type { KorraApi } from "@korra/ui";
@@ -16,6 +17,8 @@ export const BLOB_DB_NAME = "korra-blobs";
 
 export interface Booted {
   api: KorraApi;
+  /** The single local owner's context: for local-only features (exports) that read through the repositories, not `KorraApi`. */
+  ctx: Ctx;
   pg: KorraPg;
   /** The IndexedDB blob store itself (backups need `exportAll`, a wipe needs `close`). */
   rawBlobs: IndexedDbBlobStore;
@@ -53,7 +56,7 @@ async function doBoot(): Promise<Booted> {
     addEventListener("pagehide", () => blobs.revokeAll());
     void resumeStuckIngests();
     holdTabLock();
-    return { api, pg, rawBlobs, blobs };
+    return { api, ctx, pg, rawBlobs, blobs };
   } catch (e) {
     worker.terminate();
     throw e;

@@ -10,5 +10,5 @@ test("a database that cannot open shows a clear error, not a blank page", async 
   await expect(page.getByText("Your data stays in this browser and nothing was sent anywhere.")).toBeVisible();
   await expect(page.getByRole("button", { name: "Try again" })).toBeVisible();
   // The shell is still there, with the disclaimer.
-  await expect(page.getByText("Not legal or tax advice.")).toBeVisible();
+  await expect(page.getByRole("contentinfo").getByText("Not legal or tax advice.")).toBeVisible(); // the footer (the first-run privacy notice repeats the disclaimer)
 });

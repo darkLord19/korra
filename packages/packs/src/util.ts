@@ -24,3 +24,14 @@ export function monthLabel(month: YearMonth): string {
   const [y, m] = month.split("-");
   return `${MONTHS[Number(m) - 1] ?? m} ${y}`;
 }
+
+/** Drops control characters (code < 32 and DEL), optionally keeping tab, LF and CR. */
+export function stripControls(s: string, keepWhitespace = false): string {
+  let out = "";
+  for (const ch of s) {
+    const c = ch.codePointAt(0)!;
+    const control = c < 32 || c === 127;
+    if (!control || (keepWhitespace && (c === 9 || c === 10 || c === 13))) out += ch;
+  }
+  return out;
+}

@@ -9,6 +9,7 @@ import {
 import type { PGlite as PGliteType } from "@electric-sql/pglite";
 import { BLOB_DB_NAME, boot, shutdown } from "./boot";
 import { backupFilename } from "./data-safety";
+import { saveFile } from "./download";
 import { clearOwnedStorage, recordBackup, setLifecycle, setNoticeForNextLoad } from "./safety-store";
 import { otherTabCount, waitForDatabaseRelease } from "./tab-lock";
 
@@ -24,20 +25,6 @@ export const PGLITE_IDB_NAME = `${PGLITE_IDB_PREFIX}${DEFAULT_DATA_DIR.replace(/
 const CLOSE_OTHER_TABS = "Korra is open in another tab or window. Close the other ones, then try again.";
 
 /* ------------------------------------ backup ------------------------------------ */
-
-/** Hands a file to the browser's download flow. A `blob:` anchor, because `connect-src 'self'` forbids fetching one. */
-function saveFile(blob: Blob, filename: string): void {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  a.hidden = true;
-  document.body.append(a);
-  a.click();
-  a.remove();
-  // Revoking at once can cancel the download in some browsers.
-  setTimeout(() => URL.revokeObjectURL(url), 60_000);
-}
 
 /** Builds the `.korra` file, downloads it and records the time. Returns the filename. */
 export async function runBackup(now: () => Date = () => new Date()): Promise<string> {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dueNotifications, edfDueDate } from "./index";
+import { dueNotifications, edfDueDate, REALISATION_THRESHOLDS, scheduleEvents } from "./index";
 import type { ScheduleState } from "./index";
 
 describe("edfDueDate", () => {
@@ -85,5 +85,38 @@ describe("dueNotifications: realisation_due", () => {
     expect(dueNotifications(s, "2026-12-02")).toHaveLength(1);
     const o = state({ months: [], invoices: [inv("a", "2026-12-01", "overdue")] });
     expect(dueNotifications(o, "2026-12-02")).toEqual([]);
+  });
+});
+
+describe("scheduleEvents", () => {
+  const inv = (id: string, deadline: string, status: "open" | "partially_realised" | "realised" | "overdue" = "open") => ({ id, invoiceNo: `N-${id}`, deadline, status });
+
+  it("lists each month's EDF due date, and for open invoices the deadline plus the 60/30-day alerts", () => {
+    const events = scheduleEvents({ months: ["2026-10", "2026-10", "2026-09"], invoices: [inv("a", "2027-07-15")] }, "2026-10-06");
+    expect(events.map((e) => [e.date, e.uid, e.kind])).toEqual([
+      ["2026-10-30", "edf_due:2026-09", "edf_due"],
+      ["2026-11-30", "edf_due:2026-10", "edf_due"],
+      ["2027-05-16", "realisation_due:a:d60", "realisation_alert"],
+      ["2027-06-15", "realisation_due:a:d30", "realisation_alert"],
+      ["2027-07-15", "realisation_deadline:a", "realisation_deadline"],
+    ]);
+    expect(events.find((e) => e.uid === "realisation_deadline:a")).toMatchObject({ endDate: "2027-07-16", invoiceNo: "N-a" });
+  });
+
+  it("alerts are the notification thresholds, not a second copy", () => {
+    const alerts = scheduleEvents({ months: [], invoices: [inv("a", "2027-07-15")] }, "2026-10-06").filter((e) => e.kind === "realisation_alert");
+    expect(alerts.map((e) => e.daysBefore)).toEqual([...REALISATION_THRESHOLDS]);
+    for (const e of alerts) expect(dueNotifications(state({ months: [], invoices: [inv("a", "2027-07-15")] }), e.date).map((n) => n.dedupeKey)).toContain(e.uid);
+  });
+
+  it("skips realised invoices and alerts already in the past, keeps an overdue deadline", () => {
+    const events = scheduleEvents({ months: [], invoices: [inv("done", "2027-07-15", "realised"), inv("late", "2026-09-01", "overdue"), inv("soon", "2026-11-20")] }, "2026-10-06");
+    expect(events.map((e) => e.uid)).toEqual(["realisation_deadline:late", "realisation_due:soon:d30", "realisation_deadline:soon"]);
+  });
+
+  it("year and leap-day ends", () => {
+    const [e] = scheduleEvents({ months: ["2027-12"], invoices: [] }, "2026-10-06");
+    expect(e).toMatchObject({ date: "2028-01-30", endDate: "2028-01-31" });
+    expect(scheduleEvents({ months: [], invoices: [inv("x", "2028-02-28")] }, "2028-02-01").find((x) => x.kind === "realisation_deadline")!.endDate).toBe("2028-02-29");
   });
 });

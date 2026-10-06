@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { Footer } from "@korra/ui";
 import { BootGate } from "@/components/BootGate";
+import { PrivacyNotice } from "@/components/PrivacyCopy";
 import "./globals.css";
 
 export const metadata = {
@@ -32,8 +33,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
               </nav>
             </div>
           </header>
+          <PrivacyNotice />
           <main id="main" className="mx-auto w-full max-w-5xl flex-1 px-4 py-8"><BootGate>{children}</BootGate></main>
-          <div className="mx-auto w-full max-w-5xl px-4 text-xs text-muted">Your documents and details are stored only in this browser. Korra has no server copy.</div>
+          <div className="mx-auto w-full max-w-5xl px-4 text-xs text-muted">Your documents and details are stored only in this browser. Korra has no server copy.{" "}<Link href="/privacy" className="underline">Privacy</Link></div>
           <Footer />
         </div>
       </body>

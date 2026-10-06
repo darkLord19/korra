@@ -38,9 +38,15 @@ importers:
       '@korra/ingest':
         specifier: workspace:*
         version: link:../../packages/ingest
+      '@korra/packs':
+        specifier: workspace:*
+        version: link:../../packages/packs
       '@korra/ui':
         specifier: workspace:*
         version: link:../../packages/ui
+      jszip:
+        specifier: 3.10.2
+        version: 3.10.2
       next:
         specifier: ^16.3.8
         version: 16.3.8(@playwright/test@1.63.0)(@types/node@22.20.5)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
@@ -75,9 +81,9 @@ importers:
       '@types/react-dom':
         specifier: ^19.3.0
         version: 19.3.0(@types/react@19.3.0)
-      jszip:
-        specifier: 3.10.2
-        version: 3.10.2
+      ical.js:
+        specifier: 2.2.1
+        version: 2.2.1
       pdf-lib:
         specifier: 1.17.1
         version: 1.17.1
@@ -379,6 +385,9 @@ importers:
       '@types/node':
         specifier: ^22.20.5
         version: 22.20.5
+      ical.js:
+        specifier: 2.2.1
+        version: 2.2.1
       typescript:
         specifier: ~6.0.3
         version: 6.0.3
@@ -2414,6 +2423,9 @@ packages:
   https-proxy-agent@7.0.6:
     resolution: {integrity: sha512-vK9P5/iUfdl95AI+JVyUuIcVtd4ofvtrOr3HNtM2yxC9bnMbEdp3x01OhQNnjb8IJYi38VlTE3mBXwcfvywuSw==}
     engines: {node: '>= 14'}
+
+  ical.js@2.2.1:
+    resolution: {integrity: sha512-yK/UlPbEs316igb/tjRgbFA8ZV75rCsBJp/hWOatpyaPNlgw0dGDmU+FoicOcwX4xXkeXOkYiOmCqNPFpNPkQg==}
 
   iceberg-js@0.8.1:
     resolution: {integrity: sha512-1dhVQZXhcHje7798IVM+xoo/1ZdVfzOMIc8/rgVSijRK38EDqOJoGula9N/8ZI5RD8QTxNQtK/Gozpr+qUqRRA==}
@@ -4957,6 +4969,8 @@ snapshots:
       debug: 4.4.3
     transitivePeerDependencies:
       - supports-color
+
+  ical.js@2.2.1: {}
 
   iceberg-js@0.8.1: {}
 

@@ -32,8 +32,10 @@ export interface ScheduleUserState {
 }
 export type ScheduleState = ScheduleUserState[];
 
-const EDF_THRESHOLDS = [10, 3] as const;
-const REALISATION_THRESHOLDS = [60, 30] as const;
+/** Days before an EDF due date that a reminder fires. */
+export const EDF_THRESHOLDS = [10, 3] as const;
+/** Days before a realisation deadline that a reminder fires (also the alerts in the calendar export). */
+export const REALISATION_THRESHOLDS = [60, 30] as const;
 /** Catch-up window: a threshold also fires on the following 2 days, in case a cron run was missed. */
 const CATCH_UP_DAYS = 2;
 
@@ -79,4 +81,53 @@ export function dueNotifications(state: ScheduleState, today: IsoDate): Notifica
     }
   }
   return out;
+}
+
+/**
+ * One all-day calendar entry. Dates stay ISO date strings end to end (no time zones involved): `endDate` is the
+ * day after `date`, the exclusive end an all-day iCalendar event needs.
+ */
+export interface ScheduleEvent {
+  /** Stable across exports (built from the invoice id or the month, never from editable text), so a calendar can update an entry instead of duplicating it. */
+  uid: string;
+  kind: "edf_due" | "realisation_deadline" | "realisation_alert";
+  date: IsoDate;
+  endDate: IsoDate;
+  /** `edf_due` only. */
+  month?: YearMonth;
+  /** Realisation events only. */
+  invoiceNo?: string;
+  /** `realisation_alert` only: one of `REALISATION_THRESHOLDS`. */
+  daysBefore?: number;
+}
+
+/** What the calendar needs: the months that have declared invoices, and each invoice's realisation deadline and status. No amounts, names or identifiers. */
+export interface ScheduleSource {
+  months: YearMonth[];
+  invoices: ScheduleUserState["invoices"];
+}
+
+/**
+ * The calendar export's entries, using the same due date (`edfDueDate`) and thresholds (`REALISATION_THRESHOLDS`)
+ * as the reminder emails: the EDF due date of every month with invoices, and for every invoice not yet realised its
+ * deadline plus the alerts before it. An alert that is already in the past (before `today`) is left out; the
+ * deadline itself is kept even when overdue. Sorted by date, then uid, so the same data always gives the same list.
+ */
+export function scheduleEvents(source: ScheduleSource, today: IsoDate): ScheduleEvent[] {
+  const events: ScheduleEvent[] = [];
+  const add = (e: Omit<ScheduleEvent, "endDate">) => events.push({ ...e, endDate: addDays(e.date, 1) });
+
+  for (const month of [...new Set(source.months)]) {
+    add({ uid: `edf_due:${month}`, kind: "edf_due", date: edfDueDate(month), month });
+  }
+  for (const inv of source.invoices) {
+    if (inv.status === "realised") continue;
+    add({ uid: `realisation_deadline:${inv.id}`, kind: "realisation_deadline", date: inv.deadline, invoiceNo: inv.invoiceNo });
+    for (const daysBefore of REALISATION_THRESHOLDS) {
+      const date = addDays(inv.deadline, -daysBefore);
+      if (date < today) continue;
+      add({ uid: `realisation_due:${inv.id}:d${daysBefore}`, kind: "realisation_alert", date, invoiceNo: inv.invoiceNo, daysBefore });
+    }
+  }
+  return events.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.uid < b.uid ? -1 : a.uid > b.uid ? 1 : 0));
 }

@@ -55,6 +55,7 @@ Korra is an EDF compliance tool for Indian service exporters. From 1 Oct 2026, e
 | `db` | Drizzle schema with RLS on; repositories scoped to the actor; audit log. `/browser` has the bundled migrator, `PGliteWorker` with multi-tab leader election, an IndexedDB blob store, and `.korra` backup and restore |
 | `backend` | All use-cases are isomorphic (they run in Node or the browser). `/server` has `createDeps`, Better Auth, mailers and env. `/browser` has `createLocalDeps` and `ensureLocalOwner`. New: `createInvoiceManually`, `createPaymentManually`, `confirmAllFields` |
 | `ui` (V2a) | `@korra/ui`: isomorphic screens (month, tracker, pack, onboarding, settings) behind `KorraApi` (owner use-cases, `uploadFile`, `capabilities`, `KorraApiError`) and `KorraNav`. Hand entry and "I've checked these" are in the month view. `apps/web` is a server-action adapter (`src/server/actions.ts`, `src/client/server-api.ts`), behaviour unchanged |
+| `apps/local` (V2b) | Client-only v0 app: PGlite/IndexedDB boot, local `KorraApi`, strict hash-CSP two-pass build, persist/backup/restore/delete, `.ics`, "Export for my CA" (`declarations/` reserved), privacy notice and `/privacy`. `.ics`/CSV/CA-zip builders are in `@korra/packs`, schedule events in `@korra/core` |
 | `apps/spike-local` | Throwaway browser spike. Delete it once `apps/local` exists |
 
 Verified on `da735ad`:
@@ -74,7 +75,7 @@ V2a was verified and committed: lint, depcruise (both configs), typecheck, build
    - Routing goes through a `nav` prop; app-specific settings are slots.
    - Add "I've checked these" and hand-entry forms to the month view.
    - `apps/web` gets a server-action adapter and must stay identical; the e2e must pass.
-2. **V2b: `apps/local`.**
+2. ~~**V2b: `apps/local`.**~~ **Done** (commits 27e00a5 skeleton, 75d3e33 data safety, plus exports/privacy). Notes: restore preflights the file but `applyRestore` in `@korra/db` is still not atomic; `UsageStatement` in `apps/local/src/components/PrivacyCopy.tsx` is the one place V4 amends for metrics copy; `apps/local/e2e` + `pnpm e2e:local` run in CI. Original brief kept for reference:
    - **Build:** a Next app built with **webpack, not Turbopack**, because Turbopack breaks PGlite. Pages are client-rendered.
    - **Browser setup:**
      - a worker file calling `startKorraPgliteWorker()`;
