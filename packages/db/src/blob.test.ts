@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { NotFoundError, blobKeyFor, createMemoryBlobStore, createSupabaseBlobStore } from "./index";
+import { NotFoundError, blobKeyFor, createMemoryBlobStore } from "./index";
+import { createSupabaseBlobStore } from "./server";
 import { simulateBrowserPut } from "./testing";
 
 describe("memory BlobStore", () => {

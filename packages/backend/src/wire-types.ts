@@ -53,6 +53,17 @@ export interface OnboardingWire {
   complete: boolean;
 }
 
+export interface ManualEntryResult {
+  id: string;
+}
+
+export interface ConfirmAllFieldsResult {
+  entity: "invoice" | "payment";
+  id: string;
+  /** Names of the fields that were changed (each has a field_edit audit row). Empty when nothing needed confirming. */
+  changed: string[];
+}
+
 export interface RequestUploadResult {
   documentId: string;
   uploadUrl: string;

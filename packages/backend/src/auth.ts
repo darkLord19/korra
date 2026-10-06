@@ -1,7 +1,7 @@
 import { betterAuth, type BetterAuthPlugin } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { schema, type Actor } from "@korra/db";
-import type { Ctx, Deps } from "./deps";
+import type { Ctx, Deps } from "./deps-types";
 import { UnauthenticatedError } from "./errors";
 
 /**

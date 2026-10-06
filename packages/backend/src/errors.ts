@@ -1,4 +1,4 @@
-export { ForbiddenError, NotFoundError, ValidationError } from "@korra/db/iso";
+export { ForbiddenError, NotFoundError, ValidationError } from "@korra/db";
 
 /** No (valid) session. Web should redirect to sign-in. */
 export class UnauthenticatedError extends Error {

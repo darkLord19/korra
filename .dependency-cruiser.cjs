@@ -3,9 +3,16 @@
  *
  *   apps/web ──► backend (server files only), core
  *   backend  ──► core, ingest, packs, db
+ *
+ * Entry map: every package's main entry is isomorphic (runs in the browser too); server-only code lives in
+ * `<pkg>/src/server.ts` (`@korra/<pkg>/server`, starts with `import "server-only"`); browser adapters in
+ * `db/browser`, `backend/browser`, `ingest/pdf`. See docs/design/v0-client-only-and-declarations.md section A2.
  *   ingest / packs / db ──► core
  *   core     ──► nothing in the workspace
  */
+/** Node core modules (depcruise resolves `node:fs` to `fs`). */
+const NODE_BUILTINS = "^(fs|path|crypto|os|url|buffer|stream|zlib|http|https|net|child_process|worker_threads)$";
+
 /** Package-edge rule: modules under `from` must not import any `to` packages. */
 const edge = (name, from, to, comment) => ({
   name,
@@ -39,13 +46,33 @@ module.exports = {
     {
       name: "iso-entries-stay-isomorphic",
       comment:
-        "The isomorphic entries (db/iso, db/browser, ingest/iso, packs/iso, backend/core) run in the browser. Nothing reachable from them may be a server-only module (postgres/Supabase/Anthropic/Better Auth/Resend/server-only live only in those).",
+        "The main entries (db, ingest, packs, backend), the browser entries (db/browser, backend/browser), ingest/pdf, backend/schemas and everything under apps/local run in the browser. " +
+        "Nothing reachable from them may be a /server entry or a server-only module (postgres, Supabase, Anthropic, Better Auth, Resend, server-only, node:*).",
       severity: "error",
-      from: { path: "^packages/(db/src/(iso|browser)|ingest/src/iso|packs/src/iso|backend/src/core)\\.ts$" },
+      from: {
+        path: "^(packages/(db|ingest|packs|backend)/src/(index|browser|pdf|schemas)\\.ts|apps/local/)",
+      },
       to: {
-        path: "^packages/(db/src/(index|db|blob|blob-supabase)|ingest/src/(index|claude)|packs/src/index|backend/src/(index|deps|auth|mailer|env|notifications))\\.ts$",
+        path: [
+          // our own server entries and the modules that exist only for them
+          "^packages/[^/]+/src/server\\.ts$",
+          "^@korra/[^/]+/server$",
+          "^packages/(db/src/(db|blob-supabase)|ingest/src/claude|backend/src/(deps|auth|env|mailer-resend))\\.ts$",
+          // third-party server packages
+          "(^|/)node_modules/(better-auth|resend|postgres|server-only|@supabase/[^/]+|@anthropic-ai/[^/]+)/",
+          "^(better-auth|resend|postgres|server-only|@supabase/|@anthropic-ai/)",
+        ],
         reachable: true,
       },
+    },
+    {
+      name: "iso-entries-no-node-builtins",
+      comment: "Browser-reachable code must not import Node built-ins (node:fs, node:crypto, ...). Use Web APIs (globalThis.crypto).",
+      severity: "error",
+      from: {
+        path: "^(packages/(db|ingest|packs|backend)/src/(index|browser|pdf|schemas)\\.ts|apps/local/)",
+      },
+      to: { path: ["^node:", NODE_BUILTINS], reachable: true },
     },
     {
       name: "no-circular",
@@ -58,13 +85,14 @@ module.exports = {
   // so the rules above also match the bare "@korra/x" specifier.
   options: {
     doNotFollow: { path: "node_modules" },
-    exclude: { path: "(^|/)(\\.next|\\.turbo|node_modules)/|\\.test\\.ts$|^packages/config/" },
+    exclude: { path: "(^|/)(\\.next|\\.turbo)/|\\.test\\.ts$|^packages/config/" },
     tsPreCompilationDeps: true,
     enhancedResolveOptions: {
       exportsFields: ["exports"],
       conditionNames: ["import", "require", "node", "default", "types"],
     },
-    includeOnly: "^((apps|packages)/|@korra/)",
+    // Server-only third-party packages stay in the graph (as leaves) so the isomorphic rules can see them.
+    includeOnly: { path: ["^(apps|packages)/", "^@korra/", "node_modules/(better-auth|resend|postgres|server-only|@supabase|@anthropic-ai)/", "^node:", NODE_BUILTINS] },
   },
 };
 

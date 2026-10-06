@@ -5,7 +5,7 @@
 import { createFakeExtractor, createIngester, type IngestResult } from "@korra/ingest";
 import { createMemoryBlobStore, createTestDb, createTestUser, simulateBrowserPut, type MemoryBlobStore } from "@korra/db/testing";
 import type { Actor, Db } from "@korra/db";
-import type { Ctx, Deps } from "./deps";
+import type { Ctx, Deps } from "./deps-types";
 import { createMemoryMailer, type MemoryMailer } from "./mailer";
 
 export { createMemoryMailer, createTestDb, createTestUser, createMemoryBlobStore, simulateBrowserPut };

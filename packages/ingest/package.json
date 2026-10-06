@@ -5,7 +5,8 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./iso": "./src/iso.ts"
+    "./server": "./src/server.ts",
+    "./pdf": "./src/pdf.ts"
   },
   "scripts": {
     "test": "vitest run",
@@ -18,7 +19,8 @@
     "exceljs": "4.4.0",
     "papaparse": "5.7.0",
     "server-only": "^0.0.1",
-    "zod": "^4.6.5"
+    "zod": "^4.6.5",
+    "pdfjs-dist": "^5.4.0"
   },
   "devDependencies": {
     "@korra/config": "workspace:*",

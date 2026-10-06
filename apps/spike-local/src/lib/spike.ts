@@ -13,11 +13,11 @@ import {
   saveProfile,
   type Ctx,
   type Deps,
-} from "@korra/backend/core";
+} from "@korra/backend";
 import { createBrowserDb } from "@korra/db/browser";
-import { createMemoryBlobStore, schema, type Db, type MemoryBlobStore } from "@korra/db/iso";
-import { createFakeExtractor, createIngester } from "@korra/ingest/iso";
-import { renderPack } from "@korra/packs/iso";
+import { createMemoryBlobStore, schema, type Db, type MemoryBlobStore } from "@korra/db";
+import { createFakeExtractor, createIngester } from "@korra/ingest";
+import { renderPack } from "@korra/packs";
 import { sql } from "drizzle-orm";
 import { DEEL_CSV } from "./fixture.generated";
 

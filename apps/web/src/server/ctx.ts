@@ -1,7 +1,8 @@
 import "server-only";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { UnauthenticatedError, getCaCtx, getOwnerCtx, type Ctx } from "@korra/backend";
+import { UnauthenticatedError, type Ctx } from "@korra/backend";
+import { getCaCtx, getOwnerCtx } from "@korra/backend/server";
 import { getAuth } from "./auth";
 import { getDeps } from "./deps";
 

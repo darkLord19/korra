@@ -1,6 +1,6 @@
 import { assessPack } from "@korra/core";
-import { newId } from "@korra/db/iso";
-import { listLayouts, renderPack } from "@korra/packs/iso";
+import { newId } from "@korra/db";
+import { listLayouts, renderPack } from "@korra/packs";
 import type { Ctx } from "./deps-types";
 import { NotFoundError, ValidationError } from "./errors";
 import { generatePackInput, getPackDownloadsInput, markPackSubmittedInput } from "./inputs";

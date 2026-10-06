@@ -1,5 +1,5 @@
 import "server-only";
-import { createAuth, type Auth } from "@korra/backend";
+import { createAuth, type Auth } from "@korra/backend/server";
 import { nextCookies } from "better-auth/next-js";
 import { getDeps } from "./deps";
 

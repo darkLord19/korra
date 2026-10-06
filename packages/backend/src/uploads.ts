@@ -4,8 +4,8 @@ import {
   findStuckIngests,
   getDocumentForSystem,
   type DocumentRecord,
-} from "@korra/db/iso";
-import { IngestError, type IngestResult } from "@korra/ingest/iso";
+} from "@korra/db";
+import { IngestError, type IngestResult } from "@korra/ingest";
 import type { Ctx, Deps } from "./deps-types";
 import { NotFoundError, ValidationError } from "./errors";
 import { MAX_UPLOAD_BYTES, confirmUploadInput, requestUploadInput, runIngestInput, type RequestUploadInput } from "./inputs";

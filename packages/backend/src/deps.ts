@@ -1,8 +1,10 @@
-import { createClaudeExtractor, createFakeExtractor, createIngester } from "@korra/ingest";
-import { createDb, createSupabaseBlobStore } from "@korra/db";
+import { createFakeExtractor, createIngester } from "@korra/ingest";
+import { createClaudeExtractor } from "@korra/ingest/server";
+import { createDb, createSupabaseBlobStore } from "@korra/db/server";
 import type { Deps } from "./deps-types";
 import { parseEnv, type Env } from "./env";
-import { createConsoleMailer, createResendMailer } from "./mailer";
+import { createConsoleMailer } from "./mailer";
+import { createResendMailer } from "./mailer-resend";
 
 // Types live in deps-types.ts (isomorphic); re-exported so existing imports keep working.
 export type { Ctx, Deps, Ingester } from "./deps-types";

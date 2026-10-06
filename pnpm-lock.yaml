@@ -198,6 +198,9 @@ importers:
 
   packages/db:
     dependencies:
+      '@electric-sql/pglite':
+        specifier: 0.5.8
+        version: 0.5.8
       '@korra/core':
         specifier: workspace:*
         version: link:../core
@@ -207,6 +210,9 @@ importers:
       drizzle-orm:
         specifier: ~0.45.3
         version: 0.45.3(@electric-sql/pglite@0.5.8)(kysely@0.29.6)(postgres@3.4.9)
+      jszip:
+        specifier: 3.10.2
+        version: 3.10.2
       postgres:
         specifier: 3.4.9
         version: 3.4.9
@@ -214,9 +220,6 @@ importers:
         specifier: ^0.0.1
         version: 0.0.1
     devDependencies:
-      '@electric-sql/pglite':
-        specifier: ^0.5.8
-        version: 0.5.8
       '@korra/config':
         specifier: workspace:*
         version: link:../config
@@ -226,6 +229,9 @@ importers:
       drizzle-kit:
         specifier: ~0.31.11
         version: 0.31.11
+      fake-indexeddb:
+        specifier: ^6.2.2
+        version: 6.2.5
       typescript:
         specifier: ~6.0.3
         version: 6.0.3
@@ -247,6 +253,9 @@ importers:
       papaparse:
         specifier: 5.7.0
         version: 5.7.0
+      pdfjs-dist:
+        specifier: ^5.4.0
+        version: 5.7.284
       server-only:
         specifier: ^0.0.1
         version: 0.0.1
@@ -287,9 +296,6 @@ importers:
       pdf-lib:
         specifier: 1.17.1
         version: 1.17.1
-      server-only:
-        specifier: ^0.0.1
-        version: 0.0.1
       zod:
         specifier: ^4.6.5
         version: 4.6.5
@@ -2047,6 +2053,10 @@ packages:
   expect-type@1.4.0:
     resolution: {integrity: sha512-KfYbmpRm0VbLjEvVa9yGwCi9GI34xvi7A/HXYWQO65CSD2u3MczUJSuwXKFIxlGsgBQizV9q5J9NHj4VG0n+pA==}
     engines: {node: '>=12.0.0'}
+
+  fake-indexeddb@6.2.5:
+    resolution: {integrity: sha512-CGnyrvbhPlWYMngksqrSSUT1BAVP49dZocrHuK0SvtR0D5TMs5wP0o3j7jexDJW01KSadjBp1M/71o/KR3nD1w==}
+    engines: {node: '>=18'}
 
   fast-csv@4.3.6:
     resolution: {integrity: sha512-2RNSpuwwsJGP0frGsOmTb9oUF+VkFSM4SyLTDgwf2ciHWTarN0lQTC+F2f/t5J9QjW+c65VFIAAu85GsvMIusw==}
@@ -4357,6 +4367,8 @@ snapshots:
       uuid: 8.3.2
 
   expect-type@1.4.0: {}
+
+  fake-indexeddb@6.2.5: {}
 
   fast-csv@4.3.6:
     dependencies:

@@ -4,8 +4,7 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts",
-    "./iso": "./src/iso.ts"
+    ".": "./src/index.ts"
   },
   "scripts": {
     "test": "vitest run",
@@ -17,7 +16,6 @@
     "exceljs": "4.4.0",
     "jszip": "3.10.2",
     "pdf-lib": "1.17.1",
-    "server-only": "^0.0.1",
     "zod": "^4.6.5"
   },
   "devDependencies": {

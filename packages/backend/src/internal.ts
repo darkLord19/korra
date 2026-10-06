@@ -1,4 +1,4 @@
-import { createRepos, type DocumentRecord, type PackRecord, type Repos } from "@korra/db/iso";
+import { createRepos, type DocumentRecord, type PackRecord, type Repos } from "@korra/db";
 import { proposeMatches } from "@korra/core";
 import type { ZodType, z } from "zod";
 import type { Ctx, Deps } from "./deps-types";

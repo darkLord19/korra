@@ -132,6 +132,25 @@ export type DecideAllocationInput = z.input<typeof decideAllocationInput>;
 
 export const linkNocInput = z.object({ paymentId: id, documentId: id });
 
+/* ---------------------------- manual entry ---------------------------- */
+
+/** `fields` maps field names (see INVOICE_FIELD_NAMES / PAYMENT_FIELD_NAMES) to the values `editField` takes. */
+const fieldValues = z.record(z.string(), z.unknown());
+
+export const createInvoiceManuallyInput = z.object({
+  /** The uploaded document the user is typing the invoice from (optional). */
+  documentId: id.optional(),
+  month: yearMonthSchema,
+  fields: fieldValues,
+});
+export type CreateInvoiceManuallyInput = z.input<typeof createInvoiceManuallyInput>;
+
+export const createPaymentManuallyInput = z.object({ documentId: id.optional(), fields: fieldValues });
+export type CreatePaymentManuallyInput = z.input<typeof createPaymentManuallyInput>;
+
+export const confirmAllFieldsInput = z.object({ entity: z.enum(["invoice", "payment"]), id });
+export type ConfirmAllFieldsInput = z.input<typeof confirmAllFieldsInput>;
+
 /* -------------------------------- packs -------------------------------- */
 
 export const generatePackInput = z.object({ month: yearMonthSchema, adBankId: id });

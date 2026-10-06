@@ -3,7 +3,7 @@ import { fileURLToPath } from "node:url";
 import type { Field, InvoiceFacts, Money, PaymentFacts } from "@korra/core";
 import type { IngestResult } from "@korra/ingest";
 import { confirmUpload, requestUpload, runIngest, saveBank, saveProfile } from "./index";
-import type { Ctx } from "./deps";
+import type { Ctx } from "./deps-types";
 import { simulateBrowserPut, type TestDeps } from "./testing";
 
 export const f = <T>(value: T | null, confidence = 1, source: Field<T>["source"] = "extracted"): Field<T> => ({ value, confidence, source });

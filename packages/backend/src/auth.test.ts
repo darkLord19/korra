@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { UnauthenticatedError, createAuth, getCaCtx, getOwnerCtx } from "./index";
+import { UnauthenticatedError } from "./index";
+import { createAuth, getCaCtx, getOwnerCtx } from "./server";
 import { createTestDeps } from "./testing";
 
 describe("Better Auth wiring", () => {

@@ -2,7 +2,8 @@ import Anthropic from "@anthropic-ai/sdk";
 import { PDFDocument, StandardFonts } from "pdf-lib";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { money } from "@korra/core";
-import { createClaudeExtractor, createIngester, IngestError, type IngestDoc } from "./index";
+import { createIngester, IngestError, type IngestDoc } from "./index";
+import { createClaudeExtractor } from "./server";
 
 type Req = { model: string; system: string; tool_choice?: unknown; messages: { content: { type: string; source: { media_type: string } }[] }[]; output_config: { format: { type: string } } };
 const t = (value: string | null, confidence = 0.95) => ({ value, confidence });

@@ -1,6 +1,7 @@
 import "server-only";
 import { resolve } from "node:path";
-import { createConsoleMailer, createDeps, type Deps, type MailMessage, type Mailer } from "@korra/backend";
+import type { Deps, MailMessage, Mailer } from "@korra/backend";
+import { createConsoleMailer, createDeps } from "@korra/backend/server";
 
 const g = globalThis as unknown as { __korraDeps?: Promise<Deps>; __korraDevMail?: MailMessage[] };
 
