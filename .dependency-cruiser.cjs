@@ -37,6 +37,17 @@ module.exports = {
       to: { path: "^(packages/(db|ingest|packs)/|@korra/(db|ingest|packs)(/|$)|server-only|node_modules/server-only)" },
     },
     {
+      name: "iso-entries-stay-isomorphic",
+      comment:
+        "The isomorphic entries (db/iso, db/browser, ingest/iso, packs/iso, backend/core) run in the browser. Nothing reachable from them may be a server-only module (postgres/Supabase/Anthropic/Better Auth/Resend/server-only live only in those).",
+      severity: "error",
+      from: { path: "^packages/(db/src/(iso|browser)|ingest/src/iso|packs/src/iso|backend/src/core)\\.ts$" },
+      to: {
+        path: "^packages/(db/src/(index|db|blob|blob-supabase)|ingest/src/(index|claude)|packs/src/index|backend/src/(index|deps|auth|mailer|env|notifications))\\.ts$",
+        reachable: true,
+      },
+    },
+    {
       name: "no-circular",
       severity: "error",
       from: {},

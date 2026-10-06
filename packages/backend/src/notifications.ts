@@ -1,6 +1,6 @@
 import { dueNotifications, realisationOf, type NotificationIntent, type ScheduleState } from "@korra/core";
-import { listNotificationState, recordNotification } from "@korra/db";
-import type { Deps } from "./deps";
+import { listNotificationState, recordNotification } from "@korra/db/iso";
+import type { Deps } from "./deps-types";
 import { todayOf } from "./internal";
 import type { NotificationRunResult } from "./wire-types";
 

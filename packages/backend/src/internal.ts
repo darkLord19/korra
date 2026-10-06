@@ -1,7 +1,7 @@
-import { createRepos, type DocumentRecord, type PackRecord, type Repos } from "@korra/db";
+import { createRepos, type DocumentRecord, type PackRecord, type Repos } from "@korra/db/iso";
 import { proposeMatches } from "@korra/core";
 import type { ZodType, z } from "zod";
-import type { Ctx, Deps } from "./deps";
+import type { Ctx, Deps } from "./deps-types";
 import { ForbiddenError, ValidationError } from "./errors";
 import type { DocumentWire, PackWire } from "./wire-types";
 

@@ -1,4 +1,3 @@
-import { randomBytes, randomUUID } from "node:crypto";
 import type {
   Allocation,
   AdBank,
@@ -9,8 +8,8 @@ import type {
   YearMonth,
 } from "@korra/core";
 import { and, asc, eq, inArray, isNull, lt, ne, or, sql } from "drizzle-orm";
-import { blobKeyFor } from "./blob";
-import type { Db } from "./db";
+import { blobKeyFor } from "./blob-core";
+import type { Db } from "./db-type";
 import { ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import {
   INVOICE_FIELDS,
@@ -46,7 +45,13 @@ export type PackRecord = typeof s.pack.$inferSelect;
 export type PackFile = { name: string; mimeType: string; blobKey: string };
 export type CaShareRecord = typeof s.caShare.$inferSelect;
 
-export const newId = () => randomUUID();
+export const newId = () => crypto.randomUUID();
+
+/** 24 random bytes as unpadded base64url (32 chars). Web Crypto + btoa, no Node Buffer. */
+function randomToken(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(24));
+  return btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
 
 type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
 type Q = Db | Tx;
@@ -577,7 +582,7 @@ export function createRepos(db: Db, actor: Actor, opts: RepoOptions = {}) {
       if (existing) return existing;
       const [row] = await db
         .insert(s.caShare)
-        .values({ id: newId(), ownerUserId: uid, caEmail, token: randomBytes(24).toString("base64url"), createdAt: now() })
+        .values({ id: newId(), ownerUserId: uid, caEmail, token: randomToken(), createdAt: now() })
         .returning();
       return row!;
     },
