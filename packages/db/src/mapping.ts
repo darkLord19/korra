@@ -66,7 +66,8 @@ type InvoiceRow = typeof invoice.$inferSelect;
 type PaymentRow = typeof payment.$inferSelect;
 
 export function invoiceFromRow(r: InvoiceRow): InvoiceFacts {
-  const out: Record<string, unknown> = { id: r.id };
+  // inrEquivalent has no column yet (added with the declarations migration): default until then.
+  const out: Record<string, unknown> = { id: r.id, inrEquivalent: { value: null, confidence: 0, source: "default" } };
   for (const f of INVOICE_FIELDS) out[f] = fromStoredField(f, r[invoiceColumn(f)]);
   return out as unknown as InvoiceFacts;
 }

@@ -142,6 +142,7 @@ function toInvoice(i: Output["invoices"][number]): Omit<InvoiceFacts, "id" | "ad
     clientCountry: /^[A-Z]{2}$/.test(country) ? field(country, clamp01(i.clientCountry.confidence)) : missing(),
     amount,
     netRealisableValue: nrv,
+    inrEquivalent: { value: null, confidence: 0, source: "default" },
     contractRef: toText(i.contractRef),
     serviceDescription: toText(i.serviceDescription),
     sacCode: toText(i.sacCode),

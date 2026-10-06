@@ -1,5 +1,6 @@
 import "server-only";
 import type { ReadyPack } from "@korra/core";
+import type { RenderedPack } from "./rendered";
 import { renderGuide } from "./guide";
 import { getLayout } from "./layouts";
 import { renderPdf } from "./pdf";
@@ -8,12 +9,11 @@ import { renderXlsx } from "./xlsx";
 import { renderZip } from "./zip";
 
 export { listLayouts, LayoutNotFoundError } from "./layouts";
+export { renderDeclaration } from "./declaration";
 
 export const PACKAGE = "@korra/packs";
 
-export interface RenderedPack {
-  files: { name: string; mimeType: string; bytes: Uint8Array }[];
-}
+export type { RenderedPack };
 
 const enc = new TextEncoder();
 

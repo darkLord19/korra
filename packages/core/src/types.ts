@@ -25,6 +25,8 @@ export interface InvoiceFacts {
   clientCountry: Field<string>; // ISO 3166-1 alpha-2
   amount: Field<Money>;
   netRealisableValue: Field<Money>;
+  /** INR equivalent of the invoice amount. Optional for the EDF; required for declarations (₹10 lakh test). */
+  inrEquivalent: Field<Money>;
   contractRef: Field<string>; // optional field
   serviceDescription: Field<string>;
   sacCode: Field<string>;
@@ -70,6 +72,11 @@ export interface ExporterProfile {
   defaultSacCodes: string[];
   defaultAdBankId: string;
 }
+
+/** Reg. 4(2)/6 provisos: a declaration may cover invoices up to INR 10 lakh (minor units: paise). */
+export const DECLARATION_LIMIT_INR = 10_00_000_00n;
+/** Invoices with an INR equivalent in this band (INR 9 lakh to 11 lakh, in paise) get a "confirm the INR equivalent" warning. */
+export const NEAR_LIMIT_BAND = { min: 9_00_000_00n, max: 11_00_000_00n } as const;
 
 /**
  * Single source of truth for required fields. Readiness checks and the review UI
