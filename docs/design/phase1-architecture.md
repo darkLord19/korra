@@ -173,7 +173,7 @@ export interface Allocation {
 }
 ```
 
-The required fields for an invoice and a payment are listed in one exported constant, `REQUIRED_FIELDS`, in `core`. Readiness (§7.1) and the review UI both use it. They do not keep separate copies.
+The required fields are listed in one exported constant, `REQUIRED_FIELDS`, in `core`. It has `exporter` and `invoice` lists, which **block** a pack, and a `payment` list, which only marks a payment incomplete for the **tracker** and never blocks a pack. Readiness (§7.1) and the review UI both use it. They do not keep separate copies.
 
 ---
 
@@ -183,7 +183,7 @@ The required fields for an invoice and a payment are listed in one exported cons
 |---|---|---|
 | `core/matching` | `proposeMatches(invoices, payments, existing, tolerance?) → MatchProposal` | Scoring, FX/fee tolerance, N:M subset search, and keeping confirmed allocations stable |
 | `core/realisation` | `realisationOf(invoice, allocations, asOf) → Realisation` | Deadline math (9/12 months), status machine, outstanding amount |
-| `core/readiness` | `assessPack(draft) → { ok: true, pack: ReadyPack } \| { ok: false, blockers }` | Required-field checks, flag checks, unconfirmed allocations, documents still processing |
+| `core/readiness` | `assessPack(draft) → { ok: true, pack: ReadyPack } \| { ok: false, blockers }` | Required-field checks on the exporter and invoices, flag checks, invoice documents still processing |
 | `core/schedule` | `edfDueDate(month)`, `dueNotifications(state, today) → NotificationIntent[]` | The 10- and 3-day EDF reminders, the 60- and 30-day realisation reminders, dedupe keys |
 | `ingest` | `createIngester(deps).ingest(doc) → IngestResult` | Sniffing the file type, choosing a rail parser or the LLM, field confidences, normalisation |
 | `packs` | `renderPack(pack: ReadyPack, layoutId) → RenderedPack` | Bank layouts, PDF drawing, XLSX column order, zip assembly, guide templating |
@@ -256,14 +256,13 @@ export function realisationOf(invoice: InvoiceFacts, allocations: Allocation[], 
 // readiness
 export interface PackDraft {
   month: YearMonth; adBank: AdBank; exporter: ExporterProfile;
-  invoices: InvoiceFacts[]; payments: PaymentFacts[]; allocations: Allocation[];
-  pendingDocumentIds: string[];        // documents still ingesting
+  invoices: InvoiceFacts[];
+  pendingDocumentIds: string[];        // invoice (or unclassified) documents still ingesting
 }
 export type Blocker =
-  | { kind: "missing_field"; entity: "invoice" | "payment" | "exporter"; id: string; field: string }
-  | { kind: "flagged_field"; entity: "invoice" | "payment"; id: string; field: string; confidence: number }
-  | { kind: "unconfirmed_allocation"; invoiceId: string; paymentId: string }
-  | { kind: "document_pending"; documentId: string }
+  | { kind: "missing_field"; entity: "invoice" | "exporter"; id: string; field: string }
+  | { kind: "flagged_field"; entity: "invoice"; id: string; field: string; confidence: number }
+  | { kind: "document_pending"; documentId: string }      // only invoice-kind documents (or not-yet-classified ones)
   | { kind: "no_invoices" };
 declare const ready: unique symbol;
 export type ReadyPack = PackDraft & { readonly [ready]: true; generatedAt: string; rows: EdfRow[] };
@@ -272,7 +271,10 @@ export function assessPack(draft: PackDraft, now: Date): { ok: true; pack: Ready
 ```
 
 **Readiness rules**
-- `EdfRow` is one declared invoice, flattened together with its exporter, payment and realisation columns. It is the single row model that every layout renders.
+- **The EDF is an invoice declaration, not a payment document.** FEMA 23(R)/2026-RB Reg. 3(2) asks for "the amount representing the full export value of services", due within 30 days of the end of the invoice month. Realisation is tracked separately in EDPMS by the AD bank (Reg. 18).
+  - So readiness depends **only** on the exporter profile and the invoice fields.
+  - Payments, allocations and FIRAs **never** block a pack. They feed the realisation tracker (Feature 2).
+- `EdfRow` is one declared invoice, flattened together with the exporter columns. It has **no payment columns**. It is the single row model that every layout renders.
 - Only invoices in `draft.month` whose `adBankId` matches `draft.adBank.id` are included.
 - Unpaid invoices are included, with empty payment columns.
 
@@ -539,7 +541,7 @@ APP_URL
 
 | # | Question | Current assumption |
 |---|---|---|
-| Q1 | For Deel `local_transfer` payouts, the INR arrives from Deel's Indian partner bank, so the exporter's bank saw no remittance. Which AD bank's EDF declares these invoices, and where does the FIRA come from? | Invoices default to the exporter's default AD bank, and the user can edit this. The payment is marked `local_transfer` with no FIRA ref, and a non-blocking warning is shown. Needs confirmation with a bank or CA. |
+| Q1 | For Deel `local_transfer` payouts, the INR arrives from Deel's Indian partner bank, so the exporter's bank sees no inward remittance. EDPMS closure happens at the AD bank where the EDF was filed, once the export value is realised (Reg. 18(1)(g)). How does the exporter's AD bank close that entry, and should these invoices be declared at another bank? | Invoices default to the exporter's default AD bank, and the user can edit this. The payment is marked `local_transfer` with no FIRA ref, and a non-blocking warning is shown. Needs confirmation with a bank or CA. |
 | Q2 | What are the exact Deel transaction export columns? | Columns are matched through an alias table. **A real sample export is needed**, and the parser is updated when we have one. |
 | Q3 | ICICI, HDFC and Axis formats | Placeholder layouts. PRD open question 1. |
 | Q4 | LLM data residency vs PRD §11 | Allowed, with zero retention and a kill switch. Record it as ADR-0001. |
