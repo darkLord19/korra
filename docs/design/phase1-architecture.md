@@ -105,7 +105,7 @@ core      ──► (nothing in the workspace; only zod + date helpers)
 | Constraint | Consequence |
 |---|---|
 | **Data in India** (PRD §11) | The Supabase project is in **ap-south-1 (Mumbai)**. `vercel.json` sets `"regions": ["bom1"]`. |
-| **LLM calls** | Extraction sends document content to Anthropic, which is outside India. This is a **known tension with PRD §11**.<br>Use zero-retention terms.<br>Gate it behind `KORRA_LLM_ENABLED`.<br>It is a deliberate decision, recorded as ADR-0001 (to write). |
+| **LLM calls** | Extraction sends document content to Anthropic, which is outside India. This is a **known tension with PRD §11**.<br>Seek zero-retention terms before public launch.<br>Gate it behind `KORRA_LLM_ENABLED`. CSV parsing stays local.<br>It is a deliberate decision, recorded in [ADR-0001](../adr/0001-llm-extraction-outside-india.md). User-facing copy must say so plainly. |
 | **Better Auth, not Supabase Auth** | RLS on `auth.uid()` is unavailable.<br>**All authorization lives in `db` repositories**, scoped by `Actor`.<br>The browser never talks to Supabase. Only the server connects, through the pooler. The anon key is unused, and every table has RLS enabled with no policies (deny-all), as defence in depth. |
 | **Vercel body limit of about 4.5 MB** | Files never pass through a function.<br>The server issues a **signed upload URL** for Supabase Storage; the browser PUTs to it, then calls `confirmUpload`. |
 | **Function timeouts** | Ingesting runs as an **async job** (§8). The UI polls the document's status. |
@@ -326,7 +326,7 @@ export function createFakeExtractor(fixtures: Record<string, IngestResult>): Llm
 
 **Claude extractor**
 - Use the `claude-api` skill before writing it.
-- Use structured output via tool use with a strict JSON schema derived from the zod types.
+- Use structured outputs (`output_config.format` of type `json_schema`), not forced tool use (Sonnet 5.5 takes no forced `tool_choice`).
 - Default model: `claude-sonnet-5-5`.
 - Send no PII beyond the document itself.
 - Respect `KORRA_LLM_ENABLED`. When it is disabled, return `kind: "unknown"` with a warning.
@@ -345,7 +345,8 @@ export function createRepos(db: Db, actor: Actor): Repos;
   - `profile.get`, `profile.upsert`
   - `banks.list`, `banks.upsert`
 - **Documents**
-  - `documents.create`, `documents.list(month?)`, `documents.setStatus`
+  - `documents.create`, `documents.list(month?)`, `documents.setStatus` (entering `ingesting` counts an attempt), `documents.requeueStuck(olderThan, maxAttempts)` (owner-scoped)
+  - kinds: `invoice | statement | fira | noc | ack | unknown`
 - **Invoices and payments**
   - `invoices.listByMonth`, `invoices.insertExtracted`, `invoices.updateField(id, field, value)`. That last method writes the audit row in the same transaction.
   - `payments.*`, which mirrors invoices.
@@ -410,9 +411,9 @@ export function listLayouts(): { id: string; bankName: string; version: string; 
 
 1. The browser asks for an upload URL. The backend creates the `document` row with status `uploaded`.
 2. The browser PUTs the file to Storage, then calls `confirmUpload(documentId)`.
-3. `confirmUpload` sets the status to `ingesting` and schedules `runIngest(documentId)` with Next's `after()`.
+3. `confirmUpload` returns `{ documentId, ingest }`. For `ack` documents (signed bank acknowledgements) it marks them `ingested` and `ingest` is false. Otherwise it sets the status to `ingesting`, and the server action schedules `runIngest(deps, documentId)` with Next's `after()`.
 4. `runIngest` loads the blob, calls `ingest`, inserts invoices and payments, merges any FIRA, re-runs `proposeMatches` for the month, and sets the status to `ingested` (or `failed`, with an error).
-5. A Vercel cron runs `/api/cron/sweep` every 10 minutes. It re-queues documents that have been `ingesting` for more than 10 minutes, up to 3 attempts.
+5. Retries: Vercel Hobby only allows daily crons (±59 min), so `/api/cron/sweep` runs once a day as a backstop. It re-queues documents `ingesting` for more than 10 minutes (`STUCK_AFTER_MS`), up to 3 attempts (`MAX_INGEST_ATTEMPTS`). Opportunistically, the owner-only month page calls `requeueStuckIngests(ctx)`, which atomically re-enters `ingesting` (one attempt per retry, timer restarted), fails exhausted documents and returns the ids to run with `after()`.
 6. The UI polls `getMonthState` every 3 seconds while any document is pending.
 
 ### 7.6 `@korra/backend`
@@ -420,7 +421,7 @@ export function listLayouts(): { id: string; bankName: string; version: string; 
 The backend is the only interface `apps/web` uses for behaviour. Every function takes a `Ctx` first.
 
 ```ts
-export interface Deps { db: Db; blobs: BlobStore; ingester: Ingester; mailer: Mailer; clock: () => Date; appUrl: string }
+export interface Deps { db: Db; blobs: BlobStore; ingester: Ingester; mailer: Mailer; clock: () => Date; appUrl: string; authSecret: string; authUrl: string }   // auth* feed createAuth
 export interface Ctx { deps: Deps; actor: Actor }
 export function createDeps(env: Env): Deps;     // the real adapters; tests build Deps with fakes
 export class ForbiddenError, NotFoundError, ValidationError
@@ -433,40 +434,46 @@ export class ForbiddenError, NotFoundError, ValidationError
   - `saveProfile(ctx, input)`
   - `saveBank(ctx, input)`
 - **Uploads and ingest**
-  - `requestUpload(ctx, { filename, mimeType, month, hint? }) → { documentId, uploadUrl, token }`
-  - `confirmUpload(ctx, documentId)`
+  - `requestUpload(ctx, { filename, mimeType, month, hint? }) → { documentId, uploadUrl, token }` (`hint` may be `ack`)
+  - `confirmUpload(ctx, documentId) → { documentId, ingest }`
+  - `listDocuments(ctx, month?)`
+  - `requeueStuckIngests(ctx) → string[]` (owner-scoped, see §7.5)
   - `runIngest(deps, documentId)`: a system call, not an actor call
   - `sweepStuckIngests(deps)`
 - **Review and matching**
   - `getMonthState(ctx, month) → { documents, invoices, payments, allocations, realisations, blockersByBank }`
   - `editField(ctx, { entity, id, field, value })`
   - `decideAllocation(ctx, { invoiceId, paymentId, decision })`
+  - `linkNoc(ctx, { paymentId, documentId })`
 - **Packs**
   - `generatePack(ctx, { month, adBankId }) → { ok: true, packId } | { ok: false, blockers }`
   - `getPackDownloads(ctx, packId)`
   - `markPackSubmitted(ctx, { packId, ackDocumentId? })`
+  - `listPacks(ctx, month?)`, `layoutIdFor(bankName)`, `isPlaceholderLayout(layoutId)`
 - **Tracker and notifications**
   - `getTracker(ctx) → { totals: { outstanding, due60, overdue }, rows }`
   - `runDailyNotifications(deps)`: a system call
 - **CA sharing**
   - `inviteCa(ctx, email)`
-  - `acceptCaInvite(ctx, token)`
-  - `listCaClients(ctx)`
+  - `getCaInvite(ctx, token)` and `acceptCaInvite(ctx, token)`
+  - `listCaClients(ctx)` (the CA's clients) and `listMyCas(ctx)` (the owner's shares)
   - `revokeCa(ctx, shareId)`
 - **Account**
   - `deleteAccount(ctx)`
 
 Every use-case input has a zod schema exported next to it, named `saveProfileInput` and so on. Server actions parse `FormData` with these schemas.
 
+**Entry points.** `@korra/backend` is server-only. `@korra/backend/schemas` is a client-safe entry (zod input schemas, no server code). `@korra/backend/testing` builds `Deps` from PGlite, memory blobs, a fake extractor, a memory mailer and a settable clock (`createTestDeps`, `createTestOwner`, `caCtx`). `@korra/db/testing` exposes the PGlite test database and the memory blob store.
+
 The `Mailer` port has `send({ to, subject, text, html })`, with a Resend adapter and a console fake. Better Auth's emails (verification, password reset) go through the same `Mailer`.
 
 ### 7.7 `apps/web`
 
 **Auth**
-- Better Auth with email and password and email verification, using the Drizzle adapter on `@korra/db`.
-- `src/server/auth.ts` exports `auth`.
-- `src/server/ctx.ts` exports `getCtx(): Promise<Ctx>`, which reads the session and builds an owner actor.
-- `getCaCtx(ownerUserId)` builds a CA actor, which the repos then verify.
+- Better Auth with email and password and email verification lives in **`@korra/backend`**: `createAuth(deps)`, `getOwnerCtx(deps, headers)` and `getCaCtx(deps, headers, ownerUserId)`. It uses the Drizzle adapter on `@korra/db`, and its emails go through the `Mailer`.
+- `apps/web` only mounts it: `api/auth/[...all]` with the `nextCookies` plugin, and `src/server/ctx.ts` (`ownerCtx`, `caCtx`) wraps the backend helpers with the request headers.
+- The repos verify the CA share on every call.
+- Dev in-memory mode: `KORRA_DEV_INMEMORY=1` (ignored in production) swaps in PGlite, memory blobs, a console mailer and a fake extractor, with `/api/dev-upload` and `/api/dev-mail` stand-ins. Documented in the README.
 
 **Routes**
 - `(auth)/sign-in`, `(auth)/sign-up`
@@ -477,8 +484,7 @@ The `Mailer` port has `send({ to, subject, text, html })`, with a Resend adapter
 - `settings`: banks, CA sharing, delete account
 - `ca`: the client list, then `ca/[ownerId]/...` for read-only views of the same pages
 - `api/auth/[...all]`
-- `api/cron/sweep`
-- `api/cron/notify`: both cron routes check `Authorization: Bearer ${CRON_SECRET}`
+- `api/cron/sweep` (daily backstop) and `api/cron/notify` (daily): both cron routes check `Authorization: Bearer ${CRON_SECRET}`
 
 **Components and visual style**
 - Server components fetch through backend. Client components receive plain serialisable props, with bigint converted to string.
@@ -510,7 +516,7 @@ The `Mailer` port has `send({ to, subject, text, html })`, with a Resend adapter
 - **`backend`**
   - Use-case tests with `Deps` built from the memory blob store, fake ingester, fake mailer, a fixed clock and the test DB.
 - **`apps/web`**
-  - A typecheck and build, plus one Playwright smoke test of sign-up, onboarding, upload of the Deel CSV fixture, review, generate and download.
+  - A typecheck and build, plus `pnpm e2e`: a Playwright smoke test (not part of `pnpm test`) in dev in-memory mode covering sign-up, onboarding, upload of the Deel CSV fixture, review, generate, download, tracker and CA sharing.
 
 **Commands**
 - From the repo root: `pnpm test`, `pnpm lint` (eslint plus dependency-cruiser), `pnpm typecheck` and `pnpm build`.
@@ -528,6 +534,7 @@ SUPABASE_BUCKET=documents
 BETTER_AUTH_SECRET
 BETTER_AUTH_URL
 RESEND_API_KEY          # unset → console mailer
+                        # (DATABASE_URL_DIRECT and KORRA_LLM_ENABLED are read outside the backend env schema)
 MAIL_FROM
 ANTHROPIC_API_KEY
 KORRA_LLM_ENABLED=true
@@ -544,4 +551,4 @@ APP_URL
 | Q1 | For Deel `local_transfer` payouts, the INR arrives from Deel's Indian partner bank, so the exporter's bank sees no inward remittance. EDPMS closure happens at the AD bank where the EDF was filed, once the export value is realised (Reg. 18(1)(g)). How does the exporter's AD bank close that entry, and should these invoices be declared at another bank? | Invoices default to the exporter's default AD bank, and the user can edit this. The payment is marked `local_transfer` with no FIRA ref, and a non-blocking warning is shown. Needs confirmation with a bank or CA. |
 | Q2 | What are the exact Deel transaction export columns? | Columns are matched through an alias table. **A real sample export is needed**, and the parser is updated when we have one. |
 | Q3 | ICICI, HDFC and Axis formats | Placeholder layouts. PRD open question 1. |
-| Q4 | LLM data residency vs PRD §11 | Allowed, with zero retention and a kill switch. Record it as ADR-0001. |
+| Q4 | LLM data residency vs PRD §11 | Allowed with a kill switch; zero-retention terms to be sought before public launch. See ADR-0001. |

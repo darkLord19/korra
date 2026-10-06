@@ -44,10 +44,10 @@ export default async function SettingsPage() {
       </Card>
 
       <Card aria-labelledby="data-h">
-        <CardHeader id="data-h" title="Your data" description="Your PAN, GSTIN, invoices and payment records are sensitive. They are stored in India, encrypted in transit and at rest, and are not used to train AI models. Every change to an extracted value is logged." />
+        <CardHeader id="data-h" title="Your data" description="Your database and uploaded files are stored in Mumbai (India), and the app runs there too. To read PDFs and images of invoices, FIRAs and NOCs, we send them to an AI provider (Anthropic) outside India. CSV files are read on our servers. We do not use your documents to train models. Every change to an extracted value is logged." />
         <CardBody className="space-y-3">
           <h3 className="font-medium text-danger">Delete account</h3>
-          <p className="max-w-prose text-sm">This permanently removes your profile, banks, invoices, payments, packs and uploaded files from Korra, and stops all reminders. It cannot be undone. Download any packs you need first.</p>
+          <p className="max-w-prose text-sm">This permanently and immediately removes your profile, banks, invoices, payments, packs and uploaded files from our database and file store, and stops all reminders. Backups kept by our hosting providers may persist for a limited period. It cannot be undone. Download any packs you need first.</p>
           <DeleteAccountForm />
         </CardBody>
       </Card>

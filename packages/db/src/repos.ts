@@ -8,7 +8,7 @@ import type {
   PaymentFacts,
   YearMonth,
 } from "@korra/core";
-import { and, asc, eq, inArray, isNull, ne, or } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, lt, ne, or, sql } from "drizzle-orm";
 import { blobKeyFor } from "./blob";
 import type { Db } from "./db";
 import { ForbiddenError, NotFoundError, ValidationError } from "./errors";
@@ -195,6 +195,30 @@ export function createRepos(db: Db, actor: Actor, opts: RepoOptions = {}) {
         .where(eq(s.document.id, id))
         .returning();
       return row!;
+    },
+    /**
+     * Owner-scoped, atomic re-queue of THIS user's documents stuck `ingesting` since before `olderThan`.
+     * Those with attempts left go back to `ingesting` (attempt +1, stuck timer restarted) and their ids are
+     * returned; the exhausted ones are marked `failed`. Because the timer restarts in the same UPDATE,
+     * concurrent callers never re-queue the same document twice.
+     */
+    async requeueStuck(olderThan: Date, maxAttempts: number): Promise<{ requeued: string[]; failed: number }> {
+      const uid = writeOwner();
+      const t = now();
+      const stale = and(eq(s.document.userId, uid), eq(s.document.status, "ingesting"), lt(s.document.statusChangedAt, olderThan));
+      return db.transaction(async (tx) => {
+        const failed = await tx
+          .update(s.document)
+          .set({ status: "failed", error: `Ingest gave up after ${maxAttempts} attempts`, statusChangedAt: t })
+          .where(and(stale, sql`${s.document.attempts} >= ${maxAttempts}`))
+          .returning({ id: s.document.id });
+        const requeued = await tx
+          .update(s.document)
+          .set({ error: null, statusChangedAt: t, attempts: sql`${s.document.attempts} + 1` })
+          .where(and(stale, lt(s.document.attempts, maxAttempts)))
+          .returning({ id: s.document.id });
+        return { requeued: requeued.map((r) => r.id), failed: failed.length };
+      });
     },
     /**
      * Idempotent re-ingest support: deletes the invoices and payments extracted from this document

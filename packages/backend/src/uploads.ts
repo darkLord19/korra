@@ -200,7 +200,18 @@ export async function runIngest(deps: Deps, rawId: string): Promise<void> {
   await r.documents.setStatus(doc.id, "ingested");
 }
 
-/** Cron: re-run documents stuck `ingesting` for 10+ minutes (max 3 attempts), fail the exhausted ones. */
+/**
+ * Opportunistic retry for the signed-in owner (Hobby crons run once a day, so the month page calls this).
+ * Marks this user's exhausted stuck documents `failed` and re-enters `ingesting` for the rest (one attempt
+ * each, atomically), returning their ids. The caller schedules `after(() => runIngest(deps, id))` for each.
+ */
+export async function requeueStuckIngests(ctx: Ctx): Promise<string[]> {
+  requireOwner(ctx);
+  const cutoff = new Date(ctx.deps.clock().getTime() - STUCK_AFTER_MS);
+  return (await repos(ctx).documents.requeueStuck(cutoff, MAX_INGEST_ATTEMPTS)).requeued;
+}
+
+/** Cron (daily backstop): re-run documents stuck `ingesting` for 10+ minutes (max 3 attempts), fail the exhausted ones. */
 export async function sweepStuckIngests(deps: Deps): Promise<SweepResult> {
   const cutoff = new Date(deps.clock().getTime() - STUCK_AFTER_MS);
   const stuck = await findStuckIngests(deps.db, cutoff, MAX_INGEST_ATTEMPTS);

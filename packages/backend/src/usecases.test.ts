@@ -5,7 +5,7 @@ import {
   ForbiddenError, NotFoundError, ValidationError,
   acceptCaInvite, confirmUpload, decideAllocation, deleteAccount, editField, generatePack, getMonthState,
   getCaInvite, getOnboarding, getPackDownloads, getTracker, inviteCa, layoutIdFor, linkNoc, listCaClients, listMyCas,
-  markPackSubmitted, requestUpload, revokeCa, runDailyNotifications, runIngest, saveProfile, sweepStuckIngests, toWire,
+  markPackSubmitted, requestUpload, revokeCa, runDailyNotifications, requeueStuckIngests, runIngest, saveProfile, sweepStuckIngests, toWire,
 } from "./index";
 import { caCtx, createTestDeps, createTestOwner, simulateBrowserPut, type TestDeps } from "./testing";
 import { PDF, deelCsv, firaResult, invoiceResult, f, onboard, upload, usd } from "./helpers.test-util";
@@ -105,6 +105,27 @@ describe("runIngest", () => {
     expect((await r.documents.get(id)).status).toBe("failed");
     expect((await r.documents.get(id)).error).toMatch(/edited or matched/);
     expect((await r.invoices.list())[0]!.clientName.value).toBe("Acme Corporation");
+  });
+
+  it("requeueStuckIngests re-queues only this owner's stuck documents, once per attempt", async () => {
+    const o = await createTestOwner(deps);
+    const other = await createTestOwner(deps);
+    deps.ingester = { async ingest() { throw new IngestError("overloaded", { retryable: true, code: "overloaded" }); } };
+    const id = await upload(deps, o.ctx, { filename: "x.pdf", mimeType: "application/pdf", bytes: PDF, month: "2026-09" });
+    const otherId = await upload(deps, other.ctx, { filename: "y.pdf", mimeType: "application/pdf", bytes: PDF, month: "2026-09" });
+    const r = createRepos(deps.db, o.ctx.actor);
+    expect(await requeueStuckIngests(o.ctx)).toEqual([]); // not stuck yet
+    for (const attempts of [2, 3]) {
+      deps.setNow(new Date(deps.clock().getTime() + 11 * 60_000));
+      expect(await requeueStuckIngests(o.ctx)).toEqual([id]);
+      expect(await requeueStuckIngests(o.ctx)).toEqual([]); // timer restarted: no double queue
+      expect((await r.documents.get(id)).attempts).toBe(attempts);
+    }
+    deps.setNow(new Date(deps.clock().getTime() + 11 * 60_000));
+    expect(await requeueStuckIngests(o.ctx)).toEqual([]);
+    expect((await r.documents.get(id)).status).toBe("failed");
+    expect((await createRepos(deps.db, other.ctx.actor).documents.get(otherId)).attempts).toBe(1);
+    await expect(requeueStuckIngests({ ...o.ctx, actor: { userId: "ca", role: "ca", ownerUserId: o.ctx.actor.userId } })).rejects.toBeInstanceOf(ForbiddenError);
   });
 
   it("retryable errors stay ingesting for the sweep; non-retryable fail", async () => {

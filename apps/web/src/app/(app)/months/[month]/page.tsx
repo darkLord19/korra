@@ -1,8 +1,10 @@
 import { notFound, redirect } from "next/navigation";
-import { getMonthState, getOnboarding, listPacks, yearMonthSchema } from "@korra/backend";
+import { after } from "next/server";
+import { getMonthState, getOnboarding, listPacks, requeueStuckIngests, runIngest, yearMonthSchema } from "@korra/backend";
 import { MonthView } from "@/components/month/MonthView";
 import { monthLabel } from "@/lib/format";
 import { ownerCtx } from "@/server/ctx";
+import { getDeps } from "@/server/deps";
 import {
   confirmUploadAction, decideAllocationAction, editFieldAction, generatePackAction, linkNocAction, requestUploadAction,
 } from "./actions";
@@ -20,6 +22,12 @@ export default async function MonthPage({ params }: { params: Promise<{ month: s
   const ctx = await ownerCtx();
   const onboarding = await getOnboarding(ctx);
   if (!onboarding.complete) redirect("/onboarding");
+  // Hobby crons run once a day, so retry this owner's stuck documents here (the daily sweep is the backstop).
+  const stuck = await requeueStuckIngests(ctx);
+  if (stuck.length > 0) {
+    const deps = await getDeps();
+    for (const id of stuck) after(() => runIngest(deps, id));
+  }
   const [state, packs] = await Promise.all([getMonthState(ctx, month), listPacks(ctx, month)]);
   return (
     <MonthView

@@ -290,6 +290,30 @@ describe("allocations", () => {
 });
 
 describe("documents and system queries", () => {
+  it("requeueStuck is owner-scoped, counts one attempt per retry and fails exhausted documents", async () => {
+    const ra = createRepos(db, owner(a.id));
+    const rb = createRepos(db, owner(b.id));
+    const t0 = new Date("2026-10-06T10:00:00Z");
+    const t1 = new Date("2026-10-06T10:11:00Z");
+    const cutoff = new Date(t1.getTime() - 10 * 60_000);
+    const at = (uid: string, now: Date) => createRepos(db, owner(uid), { now: () => now });
+    const mine = await ra.documents.create({ filename: "m.pdf", mimeType: "application/pdf" });
+    const spent = await ra.documents.create({ filename: "s.pdf", mimeType: "application/pdf" });
+    const theirs = await rb.documents.create({ filename: "t.pdf", mimeType: "application/pdf" });
+    await at(a.id, t0).documents.setStatus(mine.id, "ingesting");
+    for (let i = 0; i < 3; i++) await at(a.id, t0).documents.setStatus(spent.id, "ingesting");
+    await at(b.id, t0).documents.setStatus(theirs.id, "ingesting");
+
+    const r1 = await at(a.id, t1).documents.requeueStuck(cutoff, 3);
+    expect(r1).toEqual({ requeued: [mine.id], failed: 1 });
+    expect((await ra.documents.get(mine.id)).attempts).toBe(2);
+    expect((await ra.documents.get(spent.id)).status).toBe("failed");
+    expect((await rb.documents.get(theirs.id)).attempts).toBe(1); // other owner untouched
+    // timer restarted: an immediate second call does nothing
+    expect(await at(a.id, t1).documents.requeueStuck(cutoff, 3)).toEqual({ requeued: [], failed: 0 });
+    expect((await ra.documents.get(mine.id)).attempts).toBe(2);
+  });
+
   it("tracks status, attempts and finds stuck ingests", async () => {
     const ra = createRepos(db, owner(a.id));
     const doc = await ra.documents.create({ filename: "inv.pdf", mimeType: "application/pdf", month: "2026-10" });
