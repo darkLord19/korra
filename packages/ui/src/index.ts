@@ -28,6 +28,6 @@ export type { PackViewProps } from "./pack/PackView";
 export { ProfileForm } from "./forms/ProfileForm";
 export { AddBankForm, BankRow } from "./forms/BankForms";
 
-export { mimeOf } from "./lib/files";
+export { mimeOf, UNSUPPORTED_FILE_MESSAGE } from "./lib/files";
 export { currentMonthIST, dateLabel, daysBetween, monthLabel, money, shiftMonth, FIELD_LABELS } from "./lib/format";
 export { majorToMinor, minorToMajor } from "./lib/money-input";

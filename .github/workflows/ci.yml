@@ -17,3 +17,21 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
+  e2e:
+    runs-on: ubuntu-latest
+    env:
+      # Both suites use Google Chrome by default; CI installs Playwright's Chromium instead.
+      E2E_BROWSER: chromium
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @korra/web exec playwright install --with-deps chromium
+      # apps/web: sign-up to EDF pack against `next dev` in its in-memory mode.
+      - run: pnpm e2e
+      # apps/local: the client-only flow against the production build with the strict CSP (builds it first).
+      - run: pnpm e2e:local

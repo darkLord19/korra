@@ -1,5 +1,5 @@
 import "server-only";
-import type { PackDownloadsWire } from "@korra/backend/schemas";
+import { isGuideFile, type PackDownloadsWire } from "@korra/backend/schemas";
 import type { PackDownloads } from "@korra/ui";
 import { getDeps, isDevInMemory } from "./deps";
 
@@ -27,7 +27,7 @@ export async function fetchText(url: string): Promise<string | null> {
 
 /** A pack's downloads ready for the browser: usable file URLs and the guide's text (read here, not by the browser). */
 export async function packForBrowser(d: PackDownloadsWire): Promise<PackDownloads> {
-  const guide = d.files.find((f) => f.name.startsWith("HOW-TO-SUBMIT"));
+  const guide = d.files.find(isGuideFile);
   const guideText = guide ? await fetchText(guide.url) : null;
   return { ...d, files: d.files.map((f) => ({ ...f, url: browserUrl(f.url) })), guideText };
 }

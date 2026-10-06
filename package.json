@@ -12,7 +12,8 @@
     "typecheck": "turbo run typecheck",
     "lint": "turbo run lint && pnpm depcruise",
     "depcruise": "depcruise apps packages --config .dependency-cruiser.cjs && depcruise apps packages --config .dependency-cruiser.client.cjs",
-    "e2e": "pnpm --filter @korra/web e2e"
+    "e2e": "pnpm --filter @korra/web e2e",
+    "e2e:local": "pnpm --filter @korra/local e2e"
   },
   "devDependencies": {
     "dependency-cruiser": "^18.5.0",

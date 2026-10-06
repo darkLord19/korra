@@ -12,3 +12,6 @@ export function mimeOf(file: File): string | null {
   if ((ALLOWED_UPLOAD_MIME_TYPES as readonly string[]).includes(declared)) return declared;
   return MIME_BY_EXT[ext] ?? null; // some browsers report CSVs as application/vnd.ms-excel or ""
 }
+
+/** What the person sees when `mimeOf` rejects their file. Shared by every adapter. */
+export const UNSUPPORTED_FILE_MESSAGE = "This file type is not supported. Use PDF, PNG, JPG, WebP, CSV or XLSX.";

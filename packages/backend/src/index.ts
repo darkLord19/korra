@@ -9,7 +9,7 @@ export type { Deps, Ctx, Ingester } from "./deps-types";
 export type { Mailer, MailMessage } from "./mailer-types";
 export { createMemoryMailer } from "./mailer";
 export type { MemoryMailer } from "./mailer";
-export { ForbiddenError, NotFoundError, ValidationError, UnauthenticatedError } from "./errors";
+export { ForbiddenError, NotFoundError, ValidationError, UnauthenticatedError, toWireError, UNKNOWN_ERROR } from "./errors";
 export { toWire } from "./wire";
 
 export { getOnboarding, saveProfile, saveBank } from "./onboarding";
@@ -23,4 +23,5 @@ export { inviteCa, getCaInvite, acceptCaInvite, listCaClients, listMyCas, revoke
 export { deleteAccount } from "./account";
 
 export * from "./inputs";
+export * from "./wire-values";
 export type * from "./wire-types";

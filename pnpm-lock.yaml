@@ -21,6 +21,73 @@ importers:
         specifier: ~6.0.3
         version: 6.0.3
 
+  apps/local:
+    dependencies:
+      '@electric-sql/pglite':
+        specifier: 0.5.8
+        version: 0.5.8
+      '@korra/backend':
+        specifier: workspace:*
+        version: link:../../packages/backend
+      '@korra/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@korra/db':
+        specifier: workspace:*
+        version: link:../../packages/db
+      '@korra/ingest':
+        specifier: workspace:*
+        version: link:../../packages/ingest
+      '@korra/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
+      next:
+        specifier: ^16.3.8
+        version: 16.3.8(@playwright/test@1.63.0)(@types/node@22.20.5)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      pdfjs-dist:
+        specifier: ^5.4.0
+        version: 5.7.284
+      react:
+        specifier: ^19.3.0
+        version: 19.3.0
+      react-dom:
+        specifier: ^19.3.0
+        version: 19.3.0(react@19.3.0)
+      zod:
+        specifier: ^4.6.5
+        version: 4.6.5
+    devDependencies:
+      '@korra/config':
+        specifier: workspace:*
+        version: link:../../packages/config
+      '@playwright/test':
+        specifier: 1.63.0
+        version: 1.63.0
+      '@tailwindcss/postcss':
+        specifier: ^4.3.3
+        version: 4.3.3
+      '@types/node':
+        specifier: ^22.20.5
+        version: 22.20.5
+      '@types/react':
+        specifier: ^19.3.0
+        version: 19.3.0
+      '@types/react-dom':
+        specifier: ^19.3.0
+        version: 19.3.0(@types/react@19.3.0)
+      pdf-lib:
+        specifier: 1.17.1
+        version: 1.17.1
+      tailwindcss:
+        specifier: ^4.3.3
+        version: 4.3.3
+      typescript:
+        specifier: ~6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: ^5.0.3
+        version: 5.0.3(@types/node@22.20.5)(jsdom@27.4.0(@noble/hashes@2.4.0))(vite@8.3.3(@types/node@22.20.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15))
+
   apps/spike-local:
     dependencies:
       '@electric-sql/pglite':

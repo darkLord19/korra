@@ -1,20 +1,15 @@
-export type KorraApiErrorKind = "validation" | "not_found" | "forbidden" | "unauthenticated" | "unknown";
+import { GENERIC_ERROR_MESSAGE, parseFieldErrors, type ApiErrorKind, type ApiErrorWire } from "@korra/backend/schemas";
+
+// The wire error shape and the field-error parser are shared with the adapters (one implementation, in the backend's client-safe entry).
+export { parseFieldErrors };
+
+export type KorraApiErrorKind = ApiErrorKind;
 
 export interface KorraApiErrorInit {
   kind: KorraApiErrorKind;
   message: string;
   /** Field name -> message. For `validation` errors it is parsed from the message when not given. */
-  fieldErrors?: Record<string, string> | undefined;
-}
-
-/** Use-case validation messages look like "field: message; field: message". */
-export function parseFieldErrors(message: string): Record<string, string> {
-  const out: Record<string, string> = {};
-  for (const part of message.split("; ")) {
-    const i = part.indexOf(": ");
-    if (i > 0 && /^[\w.]+$/.test(part.slice(0, i))) out[part.slice(0, i).split(".")[0]!] = part.slice(i + 2);
-  }
-  return out;
+  fieldErrors?: ApiErrorWire["fieldErrors"] | undefined;
 }
 
 /** What every `KorraApi` adapter throws. The screens render `message` and `fieldErrors`. */
@@ -33,7 +28,7 @@ export class KorraApiError extends Error {
 
 export const isKorraApiError = (e: unknown): e is KorraApiError => e instanceof KorraApiError;
 
-export const GENERIC_ERROR = "Something went wrong. Try again.";
+export const GENERIC_ERROR = GENERIC_ERROR_MESSAGE;
 
 /** Text to show a person for any thrown value. */
 export function errorMessage(e: unknown): string {

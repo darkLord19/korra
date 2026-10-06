@@ -23,7 +23,7 @@ module.exports = {
       // `@korra/backend/schemas` (zod input schemas + wire types; pure, no server-only/db) is allowed.
       to: {
         path: "^(packages/|@korra/)(backend|db|ingest|packs)(/|$)",
-        pathNot: "^(packages/backend/src/(schemas|inputs|wire-types)\\.ts|@korra/backend/schemas)$",
+        pathNot: "^(packages/backend/src/(schemas|inputs|wire-types|wire-values)\\.ts|@korra/backend/schemas)$",
         reachable: true,
       },
     },
@@ -31,9 +31,10 @@ module.exports = {
   options: {
     doNotFollow: { path: "node_modules" },
     exclude: {
-      // apps/spike-local is the client-only v0 spike: its "use client" modules deliberately import the
-      // isomorphic entries (db, backend, db/browser, ...) to run the use-cases in the browser.
-      path: `(^|/)(\\.next|\\.turbo|node_modules)/|\\.test\\.tsx?$|^packages/ui/src/test-(utils|setup)\\.tsx?$|^packages/config/|^apps/spike-local/|${serverActionFiles}`,
+      // apps/local (and its spike, apps/spike-local) are the client-only v0 apps: their "use client" modules
+      // deliberately import the isomorphic entries (backend, db, db/browser, ...) to run the use-cases in the
+      // browser. What may be reachable from them is enforced by the main config's iso-entries-* rules instead.
+      path: `(^|/)(\\.next|\\.turbo|node_modules)/|\\.test\\.tsx?$|^packages/ui/src/test-(utils|setup)\\.tsx?$|^packages/config/|^apps/(local|spike-local)/|${serverActionFiles}`,
     },
     tsPreCompilationDeps: false,
     enhancedResolveOptions: {

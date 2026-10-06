@@ -15,7 +15,9 @@ pnpm typecheck
 pnpm test
 pnpm build
 pnpm --filter @korra/web dev
-pnpm e2e         # Playwright smoke test (not part of pnpm test / CI)
+pnpm --filter @korra/local dev   # the client-only app (apps/local), webpack dev server
+pnpm e2e         # apps/web Playwright smoke test (runs in CI, not part of pnpm test)
+pnpm e2e:local   # apps/local Playwright flow against the strict-CSP production build
 ```
 
 ## Run locally without Supabase
@@ -66,3 +68,5 @@ Data handling and the LLM decision: [docs/adr/0001-llm-extraction-outside-india.
 ## End-to-end smoke test
 
 `pnpm e2e` starts `next dev` in the in-memory mode on a free port and drives sign-up to pack, tracker and CA sharing in your installed Google Chrome. Without Chrome, run `pnpm --filter @korra/web exec playwright install chromium` and set `E2E_BROWSER=chromium`.
+
+`pnpm e2e:local` builds `apps/local` with `pnpm build` (two passes: the second bakes in the sha256 hashes of Next's inline scripts, so the served `script-src` is strict), serves it with `next start` on a free port, and drives the whole client-only flow (onboarding, upload, review, pack, tracker), asserting that no request leaves the origin, that every request is a GET, and that the console has no CSP violations. Same Chrome/`E2E_BROWSER` convention.

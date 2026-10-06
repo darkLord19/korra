@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { isGuideFile } from "@korra/backend/schemas";
 import type { PackDownloads } from "../api";
 import { Alert, Badge, Card, CardBody, CardHeader, buttonClass } from "../components";
 import { DISCLAIMER } from "../components/Footer";
@@ -18,7 +19,7 @@ export interface PackViewProps {
 
 /** The guide's text: from the adapter when it has it, else read from the guide file's URL. */
 function useGuideText(downloads: PackDownloads): string | null {
-  const guide = downloads.files.find((f) => f.name.startsWith("HOW-TO-SUBMIT"));
+  const guide = downloads.files.find(isGuideFile);
   const given = downloads.guideText;
   const [fetched, setFetched] = useState<string | null>(null);
   const url = guide?.url;

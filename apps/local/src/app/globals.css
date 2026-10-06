@@ -1,0 +1,3 @@
+@import "tailwindcss";
+/* Design tokens, theme and base styles come from the shared UI package; it also tells Tailwind to scan its components. */
+@import "@korra/ui/styles.css";

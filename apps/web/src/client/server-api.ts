@@ -1,5 +1,5 @@
 import type { RequestUploadInput } from "@korra/backend/schemas";
-import { KorraApiError, mimeOf, type KorraApi } from "@korra/ui";
+import { KorraApiError, UNSUPPORTED_FILE_MESSAGE, mimeOf, type KorraApi } from "@korra/ui";
 import type { ActionResult } from "@/lib/action-result";
 import {
   confirmAllFieldsAction, confirmUploadAction, createInvoiceManuallyAction, createPaymentManuallyAction, decideAllocationAction,
@@ -30,7 +30,7 @@ export const serverApi: KorraApi = {
 
   async uploadFile(file, { month, hint }) {
     const mimeType = mimeOf(file);
-    if (!mimeType) throw new KorraApiError({ kind: "validation", message: "This file type is not supported. Use PDF, PNG, JPG, WebP, CSV or XLSX." });
+    if (!mimeType) throw new KorraApiError({ kind: "validation", message: UNSUPPORTED_FILE_MESSAGE });
     const { documentId, uploadUrl } = await call(
       requestUploadAction({ filename: file.name, mimeType: mimeType as RequestUploadInput["mimeType"], sizeBytes: file.size, month, ...(hint ? { hint } : {}) }),
     );

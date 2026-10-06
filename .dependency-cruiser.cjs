@@ -44,7 +44,7 @@ module.exports = {
       from: { path: "^packages/ui/" },
       to: {
         path: "^(packages/backend/|@korra/backend(/|$))",
-        pathNot: "^(packages/backend/src/(schemas|inputs|wire-types)\\.ts|@korra/backend/schemas)$",
+        pathNot: "^(packages/backend/src/(schemas|inputs|wire-types|wire-values)\\.ts|@korra/backend/schemas)$",
       },
     },
     edge(
@@ -57,17 +57,17 @@ module.exports = {
       name: "backend-schemas-pure",
       comment: "The client-safe schemas entry may import only zod and core, never db, ingest, packs or server-only.",
       severity: "error",
-      from: { path: "^packages/backend/src/(schemas|inputs|wire-types)\\.ts$" },
+      from: { path: "^packages/backend/src/(schemas|inputs|wire-types|wire-values)\\.ts$" },
       to: { path: "^(packages/(db|ingest|packs)/|@korra/(db|ingest|packs)(/|$)|server-only|node_modules/server-only)" },
     },
     {
       name: "iso-entries-stay-isomorphic",
       comment:
-        "The main entries (db, ingest, packs, backend), the browser entries (db/browser, backend/browser), ingest/pdf, backend/schemas, packages/ui and everything under apps/local run in the browser. " +
+        "The main entries (db, ingest, packs, backend), the browser entries (db/browser, backend/browser), ingest/pdf, backend/schemas, packages/ui and everything under apps/local/src run in the browser (apps/local/scripts, e2e and playwright.config.ts are Node tooling). " +
         "Nothing reachable from them may be a /server entry or a server-only module (postgres, Supabase, Anthropic, Better Auth, Resend, server-only, node:*).",
       severity: "error",
       from: {
-        path: "^(packages/(db|ingest|packs|backend)/src/(index|browser|pdf|schemas)\\.ts|packages/ui/src/|apps/local/)",
+        path: "^(packages/(db|ingest|packs|backend)/src/(index|browser|pdf|schemas)\\.ts|packages/ui/src/|apps/local/src/)",
       },
       to: {
         path: [
@@ -87,7 +87,7 @@ module.exports = {
       comment: "Browser-reachable code must not import Node built-ins (node:fs, node:crypto, ...). Use Web APIs (globalThis.crypto).",
       severity: "error",
       from: {
-        path: "^(packages/(db|ingest|packs|backend)/src/(index|browser|pdf|schemas)\\.ts|packages/ui/src/|apps/local/)",
+        path: "^(packages/(db|ingest|packs|backend)/src/(index|browser|pdf|schemas)\\.ts|packages/ui/src/|apps/local/src/)",
       },
       to: { path: ["^node:", NODE_BUILTINS], reachable: true },
     },
