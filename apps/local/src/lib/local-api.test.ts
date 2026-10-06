@@ -12,7 +12,7 @@ const DEEL_CSV = readFileSync(fileURLToPath(new URL("../../../../packages/ingest
 const csvFile = () => new File([DEEL_CSV], "synthetic-transactions.csv", { type: "text/csv" });
 
 /** Test deps whose ingester can be held back, to prove uploadFile does not wait for ingest. */
-async function setup(opts: { runner?: "real" | "never" } = {}) {
+async function setup(opts: { runner?: "real" | "never"; onPackGenerated?: () => void } = {}) {
   const base: TestDeps = await createTestDeps();
   const blobs = trackBlobs(base.blobs, () => undefined);
   const real = base.ingester;
@@ -25,7 +25,7 @@ async function setup(opts: { runner?: "real" | "never" } = {}) {
   };
   const { ctx } = await createTestOwner(deps);
   const runner = createIngestRunner(deps, ctx, opts.runner === "never" ? async () => undefined : undefined);
-  const local = createLocalApi({ ctx, blobs, ingest: runner, resumeEveryMs: 0 });
+  const local = createLocalApi({ ctx, blobs, ingest: runner, resumeEveryMs: 0, ...(opts.onPackGenerated ? { onPackGenerated: opts.onPackGenerated } : {}) });
   return {
     ...local,
     deps,
@@ -99,6 +99,54 @@ describe("local KorraApi", () => {
     const { api } = await setup();
     await expect(api.saveProfile({ legalName: "", address: "", pan: "bad", gstin: "bad" } as never)).rejects.toBeInstanceOf(KorraApiError);
     await expect(api.getPackDownloads("no-such-pack")).rejects.toBeInstanceOf(KorraApiError);
+  });
+
+  it("tells the app when a pack was generated, and only then", async () => {
+    const onPackGenerated = vi.fn();
+    const { api } = await setup({ onPackGenerated });
+    const bank = await api.saveBank({ name: "Acme Test Bank", adCode: "6390001" });
+    await api.saveProfile({ legalName: "Jane Dev", address: "12 MG Road, Bengaluru", pan: "ABCDE1234F", gstin: "29ABCDE1234F1Z5", defaultSacCodes: ["998314"], defaultAdBankId: bank.id });
+    await api.uploadFile(csvFile(), { month: "2026-09" });
+    await vi.waitFor(async () => expect((await api.getMonthState("2026-09")).payments).toHaveLength(3));
+
+    // An unknown bank fails; a month with no invoice is blocked: neither is a generated pack.
+    await expect(api.generatePack({ month: "2026-09", adBankId: "nope" })).rejects.toBeInstanceOf(KorraApiError);
+    expect(await api.generatePack({ month: "2026-09", adBankId: bank.id })).toMatchObject({ ok: false });
+    expect(onPackGenerated).not.toHaveBeenCalled();
+
+    const { id } = await api.createInvoiceManually({
+      month: "2026-09",
+      fields: {
+        invoiceNo: "INV-77", invoiceDate: "2026-09-05", clientName: "Acme Corp", clientAddress: "1 Main St, New York", clientCountry: "US",
+        amount: { minor: "150000", currency: "USD" }, netRealisableValue: { minor: "150000", currency: "USD" }, serviceDescription: "Software development services", sacCode: "998314",
+      },
+    });
+    const month = await api.getMonthState("2026-09");
+    const proposal = month.allocations.find((a) => a.invoiceId === id)!;
+    await api.decideAllocation({ invoiceId: id, paymentId: proposal.paymentId, decision: "confirm" });
+    expect(await api.generatePack({ month: "2026-09", adBankId: bank.id })).toMatchObject({ ok: true });
+    expect(onPackGenerated).toHaveBeenCalledTimes(1);
+  });
+
+  it("a failing listener never fails the pack call", async () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const { api } = await setup({ onPackGenerated: () => { throw new Error("listener"); } });
+    const bank = await api.saveBank({ name: "Acme Test Bank", adCode: "6390001" });
+    await api.saveProfile({ legalName: "Jane Dev", address: "12 MG Road, Bengaluru", pan: "ABCDE1234F", gstin: "29ABCDE1234F1Z5", defaultSacCodes: ["998314"], defaultAdBankId: bank.id });
+    await api.uploadFile(csvFile(), { month: "2026-09" });
+    await vi.waitFor(async () => expect((await api.getMonthState("2026-09")).payments).toHaveLength(3));
+    const { id } = await api.createInvoiceManually({
+      month: "2026-09",
+      fields: {
+        invoiceNo: "INV-78", invoiceDate: "2026-09-05", clientName: "Acme Corp", clientAddress: "1 Main St, New York", clientCountry: "US",
+        amount: { minor: "150000", currency: "USD" }, netRealisableValue: { minor: "150000", currency: "USD" }, serviceDescription: "Software development services", sacCode: "998314",
+      },
+    });
+    const proposal = (await api.getMonthState("2026-09")).allocations.find((a) => a.invoiceId === id)!;
+    await api.decideAllocation({ invoiceId: id, paymentId: proposal.paymentId, decision: "confirm" });
+    expect(await api.generatePack({ month: "2026-09", adBankId: bank.id })).toMatchObject({ ok: true });
+    expect(error).toHaveBeenCalled();
+    error.mockRestore();
   });
 
   it("a document a closed tab left ingesting is picked up by getMonthState once it is stuck, and only run once", async () => {

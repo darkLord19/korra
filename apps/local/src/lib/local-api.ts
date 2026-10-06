@@ -14,6 +14,8 @@ export interface LocalApiOptions {
   ctx: Ctx;
   blobs: TrackedBlobs;
   ingest: IngestRunner;
+  /** Called after `generatePack` succeeds (the layout uses it to suggest a backup). Never allowed to fail the call. */
+  onPackGenerated?: () => void;
   /** How often `getMonthState` looks for documents stuck `ingesting` (the web app does it on every month load). */
   resumeEveryMs?: number;
   now?: () => number;
@@ -44,7 +46,7 @@ export async function call<T>(fn: () => Promise<T>): Promise<T> {
  * The local `KorraApi`: calls the backend use-cases directly, in the browser, as the single local owner.
  * Mirrors `apps/web/src/client/server-api.ts` + `server/actions.ts` (server actions become direct calls).
  */
-export function createLocalApi({ ctx, blobs, ingest, resumeEveryMs = 60_000, now = Date.now }: LocalApiOptions): LocalApi {
+export function createLocalApi({ ctx, blobs, ingest, onPackGenerated, resumeEveryMs = 60_000, now = Date.now }: LocalApiOptions): LocalApi {
   let lastResume = Number.NEGATIVE_INFINITY;
   let resuming: Promise<void> | null = null;
 
@@ -97,7 +99,16 @@ export function createLocalApi({ ctx, blobs, ingest, resumeEveryMs = 60_000, now
     createPaymentManually: (input) => call(() => createPaymentManually(ctx, input)),
     confirmAllFields: (input) => call(() => confirmAllFields(ctx, input)),
 
-    generatePack: (input) => call(() => generatePack(ctx, input)),
+    generatePack: (input) =>
+      call(async () => {
+        const pack = await generatePack(ctx, input);
+        try {
+          if (pack.ok) onPackGenerated?.(); // a pack blocked by unchecked fields was not generated: nothing to back up yet
+        } catch (e) {
+          console.error("[korra] pack-generated listener failed", e);
+        }
+        return pack;
+      }),
     getPackDownloads: (packId) =>
       call(async (): Promise<PackDownloads> => {
         const d = await getPackDownloads(ctx, packId);

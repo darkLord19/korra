@@ -2,7 +2,8 @@
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { yearMonthSchema } from "@korra/backend/schemas";
-import { Alert, MonthScreen, PackScreen, SettingsScreen, TrackerScreen, OnboardingScreen, currentMonthIST, errorMessage, useApi, useNav } from "@korra/ui";
+import { Alert, MonthScreen, PackScreen, SettingsScreen, TrackerScreen, OnboardingScreen, currentMonthIST, errorMessage, useApi, useNav, type SettingsSlots } from "@korra/ui";
+import { BackupPanel, DataPanel } from "./DataPanels";
 
 const Loading = () => <p className="text-sm text-muted" role="status">Loading...</p>;
 
@@ -25,7 +26,9 @@ export function HomeRoute() {
 
 export const OnboardingRoute = () => <OnboardingScreen />;
 export const TrackerRoute = () => <TrackerScreen />;
-export const SettingsRoute = () => <SettingsScreen />;
+// Backup/restore and the danger zone belong to this app (the screen shows `backup` because `capabilities.backup` is set).
+const settingsSlots: SettingsSlots = { backup: <BackupPanel />, data: <DataPanel /> };
+export const SettingsRoute = () => <SettingsScreen slots={settingsSlots} />;
 
 /** `/month?m=YYYY-MM`. A missing or malformed month goes to the current one; before onboarding is complete, to onboarding. */
 export function MonthRoute() {
