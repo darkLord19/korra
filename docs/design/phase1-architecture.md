@@ -44,6 +44,7 @@ Use these words in code, UI copy and tests.
 | **Receipt mode** | `local_transfer`: the rail's Indian partner bank paid INR. The exporter's bank saw a domestic credit, not a remittance.<br>`swift`: foreign currency was remitted straight to the exporter's AD bank, which issues the FIRA.<br>Deel supports both. |
 | **Realising bank** | The bank where the foreign remittance actually landed.<br>For `swift`, it is the exporter's AD bank.<br>For `local_transfer`, it is the rail's partner bank. See open question Q1. |
 | **FIRA** | The Foreign Inward Remittance Advice, the bank's proof of an inward remittance. It carries a purpose code. |
+| **NOC** | A rail-issued No Objection Certificate. For a Deel SWIFT payout, the exporter's bank needs it before it will issue the FIRC/FIRA. It is a supporting document attached to a payment and bundled into the pack zip. It is not a source of payment facts. |
 | **Allocation** | A link saying "X of this payment's amount settles this invoice". Invoices and payments are N:M through allocations. |
 | **Match proposal** | The allocations the matcher suggests. The exporter confirms or rejects each one. |
 | **Realisation** | When an invoice is fully settled by confirmed allocations.<br>The deadline is invoice date + 9 months, or + 12 months for INR invoices. |
@@ -290,9 +291,10 @@ export function dueNotifications(state: ScheduleState, today: IsoDate): Notifica
 ### 7.2 `@korra/ingest`
 
 ```ts
-export interface IngestDoc { bytes: Uint8Array; mimeType: string; filename: string; hint?: "invoice" | "statement" | "fira" }
+export interface IngestDoc { bytes: Uint8Array; mimeType: string; filename: string; hint?: "invoice" | "statement" | "fira" | "noc" }
 export interface IngestResult {
-  kind: "invoice" | "statement" | "fira" | "unknown";
+  kind: "invoice" | "statement" | "fira" | "noc" | "unknown";
+  nocRef?: { reference: string | null; amount: Money | null; date: IsoDate | null };   // set when kind === "noc", used to link the NOC to a payment
   rail: RailId | null;
   invoices: Omit<InvoiceFacts, "id" | "adBankId">[];
   payments: Omit<PaymentFacts, "id">[];
@@ -314,6 +316,7 @@ export function createFakeExtractor(fixtures: Record<string, IngestResult>): Llm
 - PDF and image files go to the `LlmExtractor`.
   - That covers invoices, including Deel-generated invoice PDFs, as well as FIRA PDFs and Deel withdrawal receipts.
   - A FIRA is returned as a `payment` with `firaRef` and `purposeCode` set. Backend merges it into an existing payment if the amount, date and currency agree (§7.6).
+  - An NOC is returned as `kind: "noc"` with `nocRef`, and with no invoices or payments. Backend links the document to the matching payment (`payment.noc_document_id`). If nothing matches, the user links it by hand in review. Linked NOCs go into the supporting zip.
 - Parsers fill `confidence`:
   - Exact CSV values get 1.
   - Values that needed heuristics, such as date format guessing, get 0.7.
@@ -380,6 +383,7 @@ Blob keys look like `u/{userId}/{documentId}/{filename}`.
   - `document`, with `status: uploaded|ingesting|ingested|failed`, `kind`, `month`, `blob_key`, `attempts` and `error`
   - `invoice` and `payment`, where each fact is a JSONB `Field<T>` column for each field. The `month` and `ad_bank_id` columns are denormalised for querying.
   - `allocation`
+  - `payment.noc_document_id` (nullable), for the supporting NOC
   - `pack`
   - `field_edit` (the audit log: entity, id, field, old, new, actor and at)
   - `ca_share`
