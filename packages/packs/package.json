@@ -3,15 +3,21 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "exports": { ".": "./src/index.ts" },
+  "exports": {
+    ".": "./src/index.ts"
+  },
   "scripts": {
     "test": "vitest run",
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
+    "@korra/core": "workspace:*",
+    "exceljs": "4.4.0",
+    "jszip": "3.10.2",
+    "pdf-lib": "1.17.1",
     "server-only": "^0.0.1",
-    "@korra/core": "workspace:*"
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@korra/config": "workspace:*",

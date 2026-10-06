@@ -1,0 +1,73 @@
+{
+  "id": "generic",
+  "version": "1",
+  "bankName": "Generic",
+  "placeholder": false,
+  "columns": [
+    {
+      "header": "Exporter legal name",
+      "key": "exporterLegalName"
+    },
+    {
+      "header": "Exporter address",
+      "key": "exporterAddress"
+    },
+    {
+      "header": "PAN",
+      "key": "exporterPan"
+    },
+    {
+      "header": "GSTIN",
+      "key": "exporterGstin"
+    },
+    {
+      "header": "IEC",
+      "key": "exporterIec"
+    },
+    {
+      "header": "Invoice no",
+      "key": "invoiceNo"
+    },
+    {
+      "header": "Invoice date",
+      "key": "invoiceDate"
+    },
+    {
+      "header": "Client name",
+      "key": "clientName"
+    },
+    {
+      "header": "Client address",
+      "key": "clientAddress"
+    },
+    {
+      "header": "Client country",
+      "key": "clientCountry"
+    },
+    {
+      "header": "Currency",
+      "key": "invoiceAmount.currency"
+    },
+    {
+      "header": "Invoice amount",
+      "key": "invoiceAmount"
+    },
+    {
+      "header": "Net realisable value",
+      "key": "netRealisableValue"
+    },
+    {
+      "header": "Contract ref",
+      "key": "contractRef"
+    },
+    {
+      "header": "Service description",
+      "key": "serviceDescription"
+    },
+    {
+      "header": "SAC code",
+      "key": "sacCode"
+    }
+  ],
+  "guide": "# How to submit your EDF to {bank}\n\nMonth: {month}. Due by: {dueDate} (30 days after month-end).\n\n1. Check the attached PDF and XLSX. They list every export invoice you declared for {month}.\n2. Log in to your bank's forex or trade portal, or contact your relationship manager, and ask for the Export Declaration Form (EDF) for services exports.\n3. Submit the EDF with copies of the invoices (see the supporting zip) before {dueDate}.\n4. Keep the acknowledgement the bank gives you.\n5. Upload the acknowledgement back to Korra and mark the pack as submitted.\n\nKorra does not submit anything to the bank. Prepared by Korra. Not legal or tax advice. Verify before submission.\n"
+}
