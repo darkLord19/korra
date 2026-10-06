@@ -548,7 +548,7 @@ APP_URL
 
 | # | Question | Current assumption |
 |---|---|---|
-| Q1 | For Deel `local_transfer` payouts, the INR arrives from Deel's Indian partner bank, so the exporter's bank sees no inward remittance. EDPMS closure happens at the AD bank where the EDF was filed, once the export value is realised (Reg. 18(1)(g)). How does the exporter's AD bank close that entry, and should these invoices be declared at another bank? | Invoices default to the exporter's default AD bank, and the user can edit this. The payment is marked `local_transfer` with no FIRA ref, and a non-blocking warning is shown. Needs confirmation with a bank or CA. |
+| Q1 | Deel `local_transfer` payouts vs EDPMS closure | **Resolved** in `docs/research/2026-10-06-deel-local-transfer-edpms.md`. The EDF goes to the exporter's own AD bank. For invoices up to ₹10 lakh, the entry closes on the exporter's declaration (Reg. 4(2) proviso, can be filed quarterly in bulk). Above ₹10 lakh, the bank decides (third-party receipt, Reg. 8) or the exporter withdraws by SWIFT. Follow-up feature: a realisation declaration pack. |
 | Q2 | What are the exact Deel transaction export columns? | Columns are matched through an alias table. **A real sample export is needed**, and the parser is updated when we have one. |
 | Q3 | ICICI, HDFC and Axis formats | Placeholder layouts. PRD open question 1. |
 | Q4 | LLM data residency vs PRD §11 | Allowed with a kill switch; zero-retention terms to be sought before public launch. See ADR-0001. |
