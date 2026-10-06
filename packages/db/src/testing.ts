@@ -3,6 +3,7 @@
  * Intentionally does not import "server-only".
  */
 import { randomUUID } from "node:crypto";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
@@ -14,13 +15,16 @@ import * as schema from "./schema";
 export { createMemoryBlobStore } from "./blob";
 export type { MemoryBlobStore } from "./blob";
 
-const MIGRATIONS = fileURLToPath(new URL("../migrations", import.meta.url));
+// KORRA_MIGRATIONS_DIR lets a bundled consumer (apps/web dev mode) point at the folder, since
+// import.meta.url is not a real file path once bundled.
+const migrationsDir = (): string =>
+  process.env.KORRA_MIGRATIONS_DIR ?? join(dirname(fileURLToPath(import.meta.url)), "..", "migrations");
 
 /** Fresh in-process Postgres (PGlite) with all migrations (including RLS) applied. */
 export async function createTestDb(): Promise<Db & { $client: PGlite }> {
   const client = new PGlite();
   const db = drizzle(client, { schema });
-  await migrate(db, { migrationsFolder: MIGRATIONS });
+  await migrate(db, { migrationsFolder: migrationsDir() });
   return db;
 }
 

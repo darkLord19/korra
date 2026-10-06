@@ -17,7 +17,7 @@ export { toWire } from "./wire";
 export { getOnboarding, saveProfile, saveBank } from "./onboarding";
 export { requestUpload, confirmUpload, runIngest, sweepStuckIngests, listDocuments } from "./uploads";
 export { getMonthState, editField, decideAllocation, linkNoc } from "./review";
-export { generatePack, getPackDownloads, markPackSubmitted, listPacks, layoutIdFor } from "./packs";
+export { generatePack, getPackDownloads, markPackSubmitted, listPacks, layoutIdFor, isPlaceholderLayout } from "./packs";
 export { getTracker } from "./tracker";
 export { runDailyNotifications, composeNotification } from "./notifications";
 export { inviteCa, acceptCaInvite, listCaClients, listMyCas, revokeCa } from "./ca";

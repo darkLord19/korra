@@ -13,6 +13,7 @@
   "dependencies": {
     "@korra/backend": "workspace:*",
     "@korra/core": "workspace:*",
+    "better-auth": "~1.7.7",
     "next": "^16.3.8",
     "react": "^19.3.0",
     "react-dom": "^19.3.0"

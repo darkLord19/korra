@@ -17,7 +17,9 @@ export function layoutIdFor(bankName: string): string {
   return "generic";
 }
 
-const isPlaceholder = (layoutId: string) => listLayouts().find((l) => l.id === layoutId)?.placeholder ?? false;
+/** True when the layout is a placeholder (bank format not collected yet): the UI warns before generating. */
+export const isPlaceholderLayout = (layoutId: string): boolean => listLayouts().find((l) => l.id === layoutId)?.placeholder ?? false;
+const isPlaceholder = isPlaceholderLayout;
 
 export async function generatePack(ctx: Ctx, raw: { month: string; adBankId: string }): Promise<GeneratePackResult> {
   const userId = requireOwner(ctx);
