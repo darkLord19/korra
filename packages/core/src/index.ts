@@ -7,3 +7,4 @@ export * from "./schedule";
 export * from "./quarter";
 export * from "./declaration";
 export * from "./banks";
+export * from "./identity";

@@ -3,7 +3,7 @@
  * components and forms may import them. Use-cases parse their own input with these too.
  */
 import { z } from "zod";
-import type { Money } from "@korra/core";
+import { GSTIN_RE, PAN_RE, type Money } from "@korra/core";
 
 export const ALLOWED_UPLOAD_MIME_TYPES = [
   "application/pdf",
@@ -29,8 +29,8 @@ export const moneyWireSchema = z.object({ minor: z.string().regex(/^\d+$/, "Expe
 export const saveProfileInput = z.object({
   legalName: trimmed,
   address: trimmed,
-  pan: z.string().trim().toUpperCase().regex(/^[A-Z]{5}\d{4}[A-Z]$/, "PAN looks like ABCDE1234F"),
-  gstin: z.string().trim().toUpperCase().regex(/^\d{2}[A-Z]{5}\d{4}[A-Z][A-Z0-9]Z[A-Z0-9]$/, "GSTIN has 15 characters"),
+  pan: z.string().trim().toUpperCase().regex(PAN_RE, "PAN looks like ABCDE1234F"),
+  gstin: z.string().trim().toUpperCase().regex(GSTIN_RE, "GSTIN has 15 characters"),
   iec: z.string().trim().toUpperCase().regex(/^[A-Z0-9]{10}$/, "IEC has 10 characters").nullish().transform((v) => v ?? null),
   defaultSacCodes: z.array(z.string().trim().regex(/^\d{4,8}$/, "SAC code is 4 to 8 digits")).default([]),
   defaultAdBankId: id,

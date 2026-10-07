@@ -228,6 +228,67 @@ describe("capabilities", () => {
   });
 });
 
+describe("profile form: PAN from GSTIN", () => {
+  const pan = () => screen.getByLabelText("PAN", { exact: true }) as HTMLInputElement;
+  const gstin = () => screen.getByLabelText("GSTIN") as HTMLInputElement;
+  const mismatch = /Doesn't match the PAN inside your GSTIN \(ABCDE1234F\)\./;
+  const form = (profile: Parameters<typeof ProfileForm>[0]["profile"] = null, api = fakeApi()) => render(<Wrap api={api}><ProfileForm profile={profile} banks={[]} /></Wrap>);
+
+  it("asks for the GSTIN before the PAN", () => {
+    form();
+    expect(gstin().compareDocumentPosition(pan()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("fills an empty PAN once the GSTIN is complete (any case), and leaves it editable", async () => {
+    form();
+    await userEvent.type(gstin(), "29abcde1234f1z");
+    expect(pan().value).toBe(""); // not a full GSTIN yet
+    await userEvent.type(gstin(), "5");
+    expect(pan().value).toBe("ABCDE1234F");
+    await userEvent.clear(pan());
+    await userEvent.type(pan(), "ZZZZZ9999Z");
+    expect(pan().value).toBe("ZZZZZ9999Z");
+  });
+
+  it("never overwrites a PAN that is already there", async () => {
+    form();
+    await userEvent.type(pan(), "ZZZZZ9999Z");
+    await userEvent.type(gstin(), "29ABCDE1234F1Z5");
+    expect(pan().value).toBe("ZZZZZ9999Z");
+  });
+
+  it("warns softly when the PAN differs from the one inside the GSTIN, and still saves", async () => {
+    const saveBank = vi.fn().mockResolvedValue({ id: "b1", name: "HDFC Bank", adCode: "" });
+    const saveProfile = vi.fn().mockResolvedValue({});
+    form(null, fakeApi({ saveBank, saveProfile }));
+    await userEvent.type(screen.getByLabelText("Legal name"), "Jane Dev");
+    await userEvent.type(screen.getByLabelText("Registered address"), "12 MG Road");
+    await userEvent.type(pan(), "ZZZZZ9999Z");
+    await userEvent.type(gstin(), "29ABCDE1234F1Z5");
+    const warning = screen.getByText(mismatch);
+    expect(warning.getAttribute("role")).toBeNull(); // advice, not an error
+    expect(pan().getAttribute("aria-invalid")).not.toBe("true");
+    await userEvent.selectOptions(screen.getByLabelText("Which bank receives your foreign payments?"), "HDFC Bank");
+    await userEvent.click(screen.getByRole("button", { name: "Save and continue" }));
+    await waitFor(() => expect(saveProfile).toHaveBeenCalledWith(expect.objectContaining({ pan: "ZZZZZ9999Z", gstin: "29ABCDE1234F1Z5" })));
+    await userEvent.clear(pan());
+    await userEvent.type(pan(), "abcde1234f");
+    expect(screen.queryByText(mismatch)).toBeNull();
+  });
+
+  it("says nothing while the PAN is still being typed, or when there is no full GSTIN", async () => {
+    form();
+    await userEvent.type(gstin(), "29ABCDE1234F1Z5");
+    await userEvent.clear(pan());
+    await userEvent.type(pan(), "ZZZZ");
+    expect(screen.queryByText(/Doesn't match/)).toBeNull();
+    await userEvent.clear(gstin());
+    await userEvent.type(gstin(), "29ABCDE1234F");
+    await userEvent.type(pan(), "Z9999Z");
+    expect(screen.queryByText(/Doesn't match/)).toBeNull();
+  });
+});
+
 describe("profile form: choosing a bank", () => {
   const profile = { legalName: "Jane Dev", address: "12 MG Road", pan: "ABCDE1234F", gstin: "29ABCDE1234F1Z5", iec: null, defaultSacCodes: ["998314"], defaultAdBankId: "bank1" };
   const bankSelect = () => screen.getByLabelText("Which bank receives your foreign payments?") as HTMLSelectElement;

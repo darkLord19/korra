@@ -43,8 +43,8 @@ test("sign up to EDF pack, tracker and CA invite", async ({ page, request }) => 
   await expect(page.getByRole("heading", { name: "Set up your details" })).toBeVisible();
   await page.getByLabel("Legal name").fill("Jane Dev");
   await page.getByLabel("Registered address").fill("12 MG Road, Bengaluru");
-  await page.getByLabel("PAN", { exact: true }).fill("ABCDE1234F");
   await page.getByLabel("GSTIN").fill("29ABCDE1234F1Z5");
+  await expect(page.getByLabel("PAN", { exact: true })).toHaveValue("ABCDE1234F"); // filled in from the GSTIN
   await page.getByLabel("Which bank receives your foreign payments?").selectOption({ label: "Kotak Mahindra Bank" });
   await page.getByLabel("AD code").fill("6390001");
   await page.getByRole("button", { name: "Save and continue" }).click();
