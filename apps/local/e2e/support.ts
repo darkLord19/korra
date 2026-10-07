@@ -47,23 +47,20 @@ export function expectPrivate(seen: Privacy, origin: string): void {
   expect(seen.problems, "console errors and warnings").toEqual([]);
 }
 
-/** First run: "/" shows landing page; click "Prepare my EDF", add bank & profile, land on month. Then a reload shows "Continue your EDF". */
+/** First run: "/" shows landing page; click "Prepare my EDF", fill in the profile and pick a bank, land on month. Then a reload shows "Continue your EDF". */
 export async function completeOnboarding(page: Page): Promise<void> {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Your export declaration forms, ready for the bank." })).toBeVisible();
   await page.getByRole("link", { name: "Prepare my EDF" }).click();
   await expect(page).toHaveURL(/\/onboarding$/);
   await expect(page.getByRole("heading", { name: "Set up your details" })).toBeVisible();
-  await page.getByLabel("Bank name").fill("Acme Test Bank");
-  await page.getByLabel("AD code").fill("6390001");
-  await page.getByRole("button", { name: "Add bank" }).click();
-  await expect(page.getByText("AD code 6390001")).toBeVisible();
   await page.getByLabel("Legal name").fill("Jane Dev");
   await page.getByLabel("Registered address").fill("12 MG Road, Bengaluru");
   await page.getByLabel("PAN", { exact: true }).fill("ABCDE1234F");
   await page.getByLabel("GSTIN").fill("29ABCDE1234F1Z5");
   await page.getByLabel("Default SAC codes").fill("998314");
-  await page.getByLabel("Default AD bank").selectOption({ label: "Acme Test Bank (6390001)" });
+  await page.getByLabel("Which bank receives your foreign payments?").selectOption({ label: "Kotak Mahindra Bank" });
+  await page.getByLabel("AD code").fill("6390001");
   await page.getByRole("button", { name: "Save and continue" }).click();
   await expect(page).toHaveURL(/\/month\?m=\d{4}-\d{2}$/);
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();

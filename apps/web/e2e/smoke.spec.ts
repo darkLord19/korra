@@ -39,18 +39,15 @@ test("sign up to EDF pack, tracker and CA invite", async ({ page, request }) => 
   const link = /https?:\/\/\S+/.exec(verify.text)![0];
   await page.goto(link);
 
-  // Onboarding: one bank, then the profile.
+  // Onboarding: one form with the profile and the bank.
   await expect(page.getByRole("heading", { name: "Set up your details" })).toBeVisible();
-  await page.getByLabel("Bank name").fill("Acme Test Bank");
-  await page.getByLabel("AD code").fill("6390001");
-  await page.getByRole("button", { name: "Add bank" }).click();
-  await expect(page.getByText("AD code 6390001")).toBeVisible();
   await page.getByLabel("Legal name").fill("Jane Dev");
   await page.getByLabel("Registered address").fill("12 MG Road, Bengaluru");
   await page.getByLabel("PAN", { exact: true }).fill("ABCDE1234F");
   await page.getByLabel("GSTIN").fill("29ABCDE1234F1Z5");
   await page.getByLabel("Default SAC codes").fill("998314");
-  await page.getByLabel("Default AD bank").selectOption({ label: "Acme Test Bank (6390001)" });
+  await page.getByLabel("Which bank receives your foreign payments?").selectOption({ label: "Kotak Mahindra Bank" });
+  await page.getByLabel("AD code").fill("6390001");
   await page.getByRole("button", { name: "Save and continue" }).click();
   await expect(page).toHaveURL(/\/months\/\d{4}-\d{2}$/);
 

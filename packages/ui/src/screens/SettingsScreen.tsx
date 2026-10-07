@@ -3,7 +3,6 @@ import type { ReactNode } from "react";
 import type { OnboardingWire } from "@korra/backend/schemas";
 import { Alert, Card, CardBody, CardHeader } from "../components";
 import { useApi } from "../context";
-import { AddBankForm, BankRow } from "../forms/BankForms";
 import { ProfileForm } from "../forms/ProfileForm";
 import { useLoaded } from "./useLoaded";
 
@@ -30,20 +29,8 @@ export function SettingsScreen({ initial, slots = {} }: { initial?: OnboardingWi
       <h1 className="text-3xl font-semibold">Settings</h1>
 
       <Card aria-labelledby="profile-h">
-        <CardHeader id="profile-h" title="Exporter profile" description="These details go on every EDF. Choosing a default AD bank decides where new invoices are filed." />
+        <CardHeader id="profile-h" title="Exporter profile" description="These details go on every EDF. The bank you choose is where new invoices are filed." />
         <CardBody><ProfileForm profile={ob.profile} banks={ob.banks} submitLabel="Save profile" onSaved={() => void reload()} /></CardBody>
-      </Card>
-
-      <Card aria-labelledby="banks-h">
-        <CardHeader id="banks-h" title="AD banks" description="Korra prepares one pack per bank. To change which bank is the default, use the profile above." />
-        <CardBody className="space-y-4">
-          {ob.banks.length > 0 && (
-            <ul className="divide-y divide-line rounded-md border border-line text-sm">
-              {ob.banks.map((b) => <BankRow key={b.id} bank={b} isDefault={ob.profile?.defaultAdBankId === b.id} onSaved={() => void reload()} />)}
-            </ul>
-          )}
-          <AddBankForm onSaved={() => void reload()} />
-        </CardBody>
       </Card>
 
       {caSharing && slots.caSharing}

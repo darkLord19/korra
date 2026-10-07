@@ -65,7 +65,7 @@ async function snapshot(page: Page, packUrl: string): Promise<Snapshot> {
   await page.goto(packUrl);
   const downloads = page.getByRole("link", { name: "Download" });
   await expect(downloads).toHaveCount(4);
-  await expect(page.getByRole("heading", { name: "How to submit your EDF to Acme Test Bank" })).toBeVisible(); // the guide, read from the local store
+  await expect(page.getByRole("heading", { name: "How to submit your EDF to Kotak Mahindra Bank" })).toBeVisible(); // the guide, read from the local store
   const pack = await content(main);
   const files: Snapshot["files"] = [];
   for (let i = 0; i < 4; i++) {
@@ -225,7 +225,8 @@ test.describe("backup, restore and delete", () => {
     await expect(page).toHaveURL(/\/month\?m=\d{4}-\d{2}$/);
     await page.goto("/settings");
     await expect(page.getByLabel("Legal name")).toHaveValue("Jane Dev");
-    await expect(page.getByText("AD code 6390001")).toBeVisible();
+    await expect(page.getByLabel("Which bank receives your foreign payments?")).toHaveValue("kotak");
+    await expect(page.getByLabel("AD code")).toHaveValue("6390001");
     expectPrivate(seen, origin);
   });
 

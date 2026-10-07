@@ -28,7 +28,7 @@ export default function Home() {
         <div className="mt-8 space-y-3">
           <h2 className="text-lg font-semibold">How it works</h2>
           <ol className="max-w-xl list-decimal space-y-2 pl-5 text-sm">
-            <li><strong>Set up:</strong> Add your AD banks and exporter profile once.</li>
+            <li><strong>Set up:</strong> Choose your bank and add your exporter details once.</li>
             <li><strong>Upload invoices:</strong> Drop in PDFs or a Deel export CSV. Korra checks them and flags anything to confirm.</li>
             <li><strong>Download your EDF pack:</strong> Get the ready-to-submit pack and covering letter for your bank.</li>
           </ol>

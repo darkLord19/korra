@@ -34,7 +34,7 @@ export function PacksSection({ month, blockersByBank, invoices, packs, readOnly 
     <Card aria-labelledby="packs-h" id="packs">
       <CardHeader id="packs-h" title={mode === "edf" ? "Step 3 · Download your EDF pack" : "EDF packs"} description={`${readOnly ? "" : "One pack per AD bank. "}EDFs for ${monthLabel(month)} are due by ${dateLabel(edfDueDate(month))}.`} />
       <CardBody className="space-y-6">
-        {blockersByBank.length === 0 && <p className="text-sm text-muted">{readOnly ? "No AD banks on this account." : "Add an AD bank in your profile to generate a pack."}</p>}
+        {blockersByBank.length === 0 && <p className="text-sm text-muted">{readOnly ? "No AD banks on this account." : "Choose your bank in your profile to generate a pack."}</p>}
         {blockersByBank.map((b) => (
           <div key={b.adBankId} className="space-y-3 rounded-md border border-line p-4">
             <h3 className="font-medium">{b.adBankName}</h3>

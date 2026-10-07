@@ -179,7 +179,7 @@ test("calendar and CA exports: built in the browser from the same data the scree
   await expect(page.getByText(`Saved ${name} with 1 pack and 2 invoices.`)).toBeVisible();
   const zip = await JSZip.loadAsync(await bytesOf(zipDownload));
   const entries = Object.keys(zip.files).sort();
-  const packDir = "packs/2026-09-acme-test-bank/";
+  const packDir = "packs/2026-09-kotak-mahindra-bank/";
   expect(entries).toEqual([
     "README.txt",
     "korra-calendar.ics",
@@ -223,7 +223,7 @@ test("calendar and CA exports: built in the browser from the same data the scree
   expect(readme).toMatch(/COPY of the exporter's records/);
   expect(readme).toMatch(/not live sharing/);
   expect(readme).toMatch(/Nothing was uploaded/);
-  for (const part of ["tracker.csv", "korra-calendar.ics", "packs/2026-09-acme-test-bank/", "marked submitted", DISCLAIMER]) expect(readme).toContain(part);
+  for (const part of ["tracker.csv", "korra-calendar.ics", "packs/2026-09-kotak-mahindra-bank/", "marked submitted", DISCLAIMER]) expect(readme).toContain(part);
 
   // Privacy: building and downloading both files made no request that leaves the origin or changes anything.
   expectPrivate(seen, origin);

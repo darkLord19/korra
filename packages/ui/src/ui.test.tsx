@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { KorraApiError } from "./errors";
+import { ProfileForm } from "./forms/ProfileForm";
 import { MonthScreen } from "./screens/MonthScreen";
 import { OnboardingScreen } from "./screens/OnboardingScreen";
 import { SettingsScreen } from "./screens/SettingsScreen";
@@ -210,11 +211,134 @@ describe("capabilities", () => {
   });
 });
 
+describe("profile form: choosing a bank", () => {
+  const profile = { legalName: "Jane Dev", address: "12 MG Road", pan: "ABCDE1234F", gstin: "29ABCDE1234F1Z5", iec: null, defaultSacCodes: ["998314"], defaultAdBankId: "bank1" };
+  const bankSelect = () => screen.getByLabelText("Which bank receives your foreign payments?") as HTMLSelectElement;
+  const adInput = () => screen.getByLabelText(/^AD code/) as HTMLInputElement;
+  const fillProfile = async () => {
+    await userEvent.type(screen.getByLabelText("Legal name"), "Jane Dev");
+    await userEvent.type(screen.getByLabelText("Registered address"), "12 MG Road");
+    await userEvent.type(screen.getByLabelText("PAN"), "ABCDE1234F");
+    await userEvent.type(screen.getByLabelText("GSTIN"), "29ABCDE1234F1Z5");
+    await userEvent.type(screen.getByLabelText("Default SAC codes"), "998314");
+  };
+  const apis = () => {
+    const saveBank = vi.fn().mockImplementation(async (i: { id?: string; name: string; adCode: string }) => ({ id: i.id ?? "new1", name: i.name, adCode: i.adCode }));
+    const saveProfile = vi.fn().mockResolvedValue({});
+    return { saveBank, saveProfile, api: fakeApi({ saveBank, saveProfile }) };
+  };
+
+  it("offers the catalog plus Other bank, with no 'Add bank' step", () => {
+    render(<Wrap api={fakeApi()}><ProfileForm profile={null} banks={[]} /></Wrap>);
+    const options = Array.from(bankSelect().options).map((o) => o.text);
+    expect(options).toEqual(expect.arrayContaining(["HDFC Bank", "ICICI Bank", "Axis Bank", "Punjab National Bank", "Other bank"]));
+    expect(screen.queryByRole("button", { name: "Add bank" })).toBeNull();
+    expect(screen.queryByLabelText("Bank name")).toBeNull();
+  });
+
+  it("creates the bank for a catalog choice (AD code optional), then saves the profile with its id", async () => {
+    const { api, saveBank, saveProfile } = apis();
+    render(<Wrap api={api}><ProfileForm profile={null} banks={[]} /></Wrap>);
+    expect(adInput().hasAttribute("required")).toBe(false);
+    expect(screen.getByText(/Leave blank if you don't have it; your bank can fill it in\./)).toBeTruthy();
+    await fillProfile();
+    await userEvent.selectOptions(bankSelect(), "HDFC Bank");
+    await userEvent.click(screen.getByRole("button", { name: "Save and continue" }));
+    await waitFor(() => expect(saveProfile).toHaveBeenCalled());
+    expect(saveBank).toHaveBeenCalledWith({ name: "HDFC Bank", adCode: "" });
+    expect(saveProfile).toHaveBeenCalledWith(expect.objectContaining({ legalName: "Jane Dev", defaultAdBankId: "new1" }));
+  });
+
+  it("'Other bank' reveals a free-text name that becomes the bank's name", async () => {
+    const { api, saveBank, saveProfile } = apis();
+    render(<Wrap api={api}><ProfileForm profile={null} banks={[]} /></Wrap>);
+    await fillProfile();
+    await userEvent.selectOptions(bankSelect(), "Other bank");
+    await userEvent.type(screen.getByLabelText("Bank name"), "  Federal Bank ");
+    await userEvent.type(adInput(), "1234567");
+    await userEvent.click(screen.getByRole("button", { name: "Save and continue" }));
+    await waitFor(() => expect(saveProfile).toHaveBeenCalled());
+    expect(saveBank).toHaveBeenCalledWith({ name: "Federal Bank", adCode: "1234567" });
+    expect(saveProfile).toHaveBeenCalledWith(expect.objectContaining({ defaultAdBankId: "new1" }));
+  });
+
+  it("reuses an existing bank row with the same name (any case), updating its AD code", async () => {
+    const { api, saveBank, saveProfile } = apis();
+    render(<Wrap api={api}><ProfileForm profile={null} banks={[{ id: "old9", name: "hdfc bank", adCode: "" }]} /></Wrap>);
+    await fillProfile();
+    await userEvent.selectOptions(bankSelect(), "HDFC Bank");
+    await userEvent.type(adInput(), "6390009");
+    await userEvent.click(screen.getByRole("button", { name: "Save and continue" }));
+    await waitFor(() => expect(saveProfile).toHaveBeenCalled());
+    expect(saveBank).toHaveBeenCalledWith({ id: "old9", name: "HDFC Bank", adCode: "6390009" });
+    expect(saveProfile).toHaveBeenCalledWith(expect.objectContaining({ defaultAdBankId: "old9" }));
+  });
+
+  it("hints at ICICI's code only while ICICI is chosen and the code is empty, and never fills it in", async () => {
+    render(<Wrap api={fakeApi()}><ProfileForm profile={null} banks={[]} /></Wrap>);
+    const hint = /ICICI Bank's own EDF form uses 6390002/;
+    expect(screen.queryByText(hint)).toBeNull();
+    await userEvent.selectOptions(bankSelect(), "HDFC Bank");
+    expect(screen.queryByText(hint)).toBeNull();
+    await userEvent.selectOptions(bankSelect(), "ICICI Bank");
+    expect(screen.getByText(hint)).toBeTruthy();
+    expect(adInput().value).toBe("");
+    await userEvent.type(adInput(), "1234567");
+    expect(screen.queryByText(hint)).toBeNull();
+  });
+
+  it("when editing a bank outside the catalog, selects 'Other bank' with its name and AD code", () => {
+    render(<Wrap api={fakeApi()}><ProfileForm profile={profile} banks={[bank, { id: "x", name: "HDFC Bank", adCode: "" }]} /></Wrap>);
+    expect(bankSelect().value).toBe("other"); // "Acme Test Bank" is not in the catalog
+    expect((screen.getByLabelText("Bank name") as HTMLInputElement).value).toBe("Acme Test Bank");
+    expect(adInput().value).toBe("6390001");
+  });
+
+  it("when editing a catalog bank, selects it and updates its row instead of creating one", async () => {
+    const { api, saveBank, saveProfile } = apis();
+    render(<Wrap api={api}><ProfileForm profile={{ ...profile, defaultAdBankId: "b2" }} banks={[bank, { id: "b2", name: "ICICI Bank", adCode: "6390002" }]} submitLabel="Save profile" /></Wrap>);
+    expect(bankSelect().value).toBe("icici");
+    expect(screen.queryByLabelText("Bank name")).toBeNull();
+    expect(adInput().value).toBe("6390002");
+    await userEvent.clear(adInput());
+    await userEvent.click(screen.getByRole("button", { name: "Save profile" }));
+    await waitFor(() => expect(saveProfile).toHaveBeenCalled());
+    expect(saveBank).toHaveBeenCalledWith({ id: "b2", name: "ICICI Bank", adCode: "" });
+    expect(saveProfile).toHaveBeenCalledWith(expect.objectContaining({ defaultAdBankId: "b2" }));
+  });
+
+  it("switching to another bank that already has a row shows that row's AD code", async () => {
+    render(<Wrap api={fakeApi()}><ProfileForm profile={null} banks={[{ id: "b3", name: "Axis Bank", adCode: "1111111" }]} /></Wrap>);
+    await userEvent.selectOptions(bankSelect(), "Axis Bank");
+    expect(adInput().value).toBe("1111111");
+    await userEvent.selectOptions(bankSelect(), "Yes Bank");
+    expect(adInput().value).toBe("");
+  });
+
+  it("shows a bank-name error from the server against the bank field", async () => {
+    const saveBank = vi.fn().mockRejectedValue(new KorraApiError({ kind: "validation", message: "Check the form", fieldErrors: { name: "Enter the bank name" } }));
+    render(<Wrap api={fakeApi({ saveBank })}><ProfileForm profile={null} banks={[]} /></Wrap>);
+    await fillProfile();
+    await userEvent.selectOptions(bankSelect(), "Other bank");
+    await userEvent.type(screen.getByLabelText("Bank name"), "X");
+    await userEvent.click(screen.getByRole("button", { name: "Save and continue" }));
+    expect(await screen.findByText("Enter the bank name")).toBeTruthy();
+  });
+});
+
 describe("onboarding screen", () => {
   it("renders the optional step indicator", async () => {
     const onboarding = { profile: null, banks: [bank], complete: false };
     render(<Wrap api={fakeApi({ getOnboarding: vi.fn().mockResolvedValue(onboarding) })}><OnboardingScreen step="Step 1 of 3 · Your details" /></Wrap>);
     expect(await screen.findByText("Step 1 of 3 · Your details")).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Set up your details" })).toBeTruthy();
+  });
+
+  it("is one form: no AD banks card and no 'Add bank'", async () => {
+    render(<Wrap api={fakeApi({ getOnboarding: vi.fn().mockResolvedValue({ profile: null, banks: [], complete: false }) })}><OnboardingScreen /></Wrap>);
+    expect(await screen.findByLabelText("Which bank receives your foreign payments?")).toBeTruthy();
+    expect(screen.queryByText("Your AD banks")).toBeNull();
+    expect(screen.queryByText(/one pack per bank/)).toBeNull();
+    expect(screen.queryByRole("button", { name: "Add bank" })).toBeNull();
   });
 });
