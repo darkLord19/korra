@@ -53,6 +53,22 @@ export interface OnboardingWire {
   complete: boolean;
 }
 
+/** What an invoice says about its issuer (the exporter), to pre-fill the profile form. Every value is a suggestion; null = not found. */
+export interface ProfileSuggestionWire {
+  legalName: string | null;
+  address: string | null;
+  gstin: string | null;
+  /** From the GSTIN when there is one. */
+  pan: string | null;
+  sacCode: string | null;
+  /** `key` of the BANK_CATALOG bank the invoice's IFSC or bank name points to. */
+  bankKey: string | null;
+  /** A bank name that is not in the catalog (the form offers it under "Other bank"). */
+  otherBankName: string | null;
+  /** Month ("YYYY-MM") of the invoice date, for filing the invoice itself. */
+  invoiceMonth: string | null;
+}
+
 export interface ManualEntryResult {
   id: string;
 }

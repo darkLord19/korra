@@ -27,3 +27,25 @@ export function findCatalogBank(name: string): BankCatalogEntry | undefined {
   const n = name.trim().toLowerCase();
   return n ? BANK_CATALOG.find((b) => b.name.toLowerCase() === n) : undefined;
 }
+
+/** IFSC prefixes (first 4 characters) of the catalog banks. Only prefixes that are certain; other banks are left to the user. */
+const IFSC_PREFIX_TO_KEY: Record<string, string> = {
+  HDFC: "hdfc", ICIC: "icici", UTIB: "axis", SBIN: "sbi", KKBK: "kotak",
+  YESB: "yes", IDFB: "idfc-first", INDB: "indusind", BARB: "bob", PUNB: "pnb",
+};
+
+/** The catalog bank an IFSC belongs to, by its 4-letter bank prefix. */
+export function findCatalogBankByIfsc(ifsc: string): BankCatalogEntry | undefined {
+  const key = IFSC_PREFIX_TO_KEY[ifsc.trim().toUpperCase().slice(0, 4)];
+  return key ? BANK_CATALOG.find((b) => b.key === key) : undefined;
+}
+
+const words = (s: string) => ` ${s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim()} `;
+
+/** The catalog bank a printed bank name points to: an exact name, or a name that contains one ("HDFC Bank Ltd."). */
+export function findCatalogBankInName(name: string): BankCatalogEntry | undefined {
+  const exact = findCatalogBank(name);
+  if (exact) return exact;
+  const n = words(name);
+  return BANK_CATALOG.find((b) => n.includes(words(b.name)));
+}

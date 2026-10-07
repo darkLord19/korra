@@ -168,6 +168,26 @@ describe("local KorraApi", () => {
     expect(month.invoices.find((i) => i.invoiceNo.value === "INV-B2")!.sacCode).toEqual({ value: "998313", confidence: 0.7, source: "default" });
   });
 
+  it("extractProfileFromInvoice reads a PDF with the on-device reader and stores nothing", async () => {
+    const base = await createTestDeps();
+    const blobs = trackBlobs(base.blobs, () => undefined);
+    const ingest = vi.fn();
+    const deps: TestDeps = { ...base, blobs: blobs as unknown as TestDeps["blobs"], ingester: createLocalDeps({ db: base.db, blobs, getTextLayer: async (b) => new TextDecoder().decode(b).split("\n").slice(1) }).ingester };
+    const { ctx } = await createTestOwner(deps);
+    const { api } = createLocalApi({ ctx, blobs, ingest: { start: ingest, isRunning: () => false, resumeStuck: async () => [] }, resumeEveryMs: 0 });
+    const pdf = new File(["%PDF-1.4\nJANE DEV CONSULTING\n12 MG Road, Bengaluru 560001, India\nGSTIN: 29ABCDE1234F1Z5\nInvoice No: INV-1\nInvoice Date: 02 Sep 2026\nBill To: Acme Corp\nTotal USD 1,500.00\nIFSC: UTIB0000123\n"], "inv.pdf", { type: "application/pdf" });
+    expect(await api.extractProfileFromInvoice(pdf)).toEqual({
+      legalName: "JANE DEV CONSULTING", address: "12 MG Road, Bengaluru 560001, India", gstin: "29ABCDE1234F1Z5", pan: "ABCDE1234F",
+      sacCode: null, bankKey: "axis", otherBankName: null, invoiceMonth: "2026-09",
+    });
+    expect(await api.listDocuments()).toEqual([]);
+    expect((await api.getOnboarding()).profile).toBeNull();
+    expect(ingest).not.toHaveBeenCalled();
+    // an image or scan comes back empty rather than failing; a CSV is refused
+    expect(await api.extractProfileFromInvoice(new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0, 0, 0, 0])], "scan.png", { type: "image/png" }))).toMatchObject({ legalName: null, gstin: null });
+    await expect(api.extractProfileFromInvoice(new File(["a,b"], "x.csv", { type: "text/csv" }))).rejects.toBeInstanceOf(KorraApiError);
+  });
+
   it("a document a closed tab left ingesting is picked up by getMonthState once it is stuck, and only run once", async () => {
     // "never" = the tab that uploaded it died before ingest ran.
     const t = await setup({ runner: "never" });

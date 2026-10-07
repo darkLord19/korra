@@ -37,6 +37,14 @@ export const saveProfileInput = z.object({
 });
 export type SaveProfileInput = z.input<typeof saveProfileInput>;
 
+/** One of the user's own export invoices (PDF or image), read only to suggest profile values. Parse-only: it is never stored. */
+export const SUGGEST_MIME_TYPES = ["application/pdf", "image/png", "image/jpeg", "image/webp"] as const;
+export const suggestProfileInput = z.object({
+  filename: z.string().trim().min(1).max(255),
+  mimeType: z.enum(SUGGEST_MIME_TYPES, "Use a PDF or an image of the invoice"),
+  sizeBytes: z.number().int().positive("The file is empty").max(MAX_UPLOAD_BYTES, "Files are limited to 20 MB"),
+});
+
 /** Optional: the bank can fill the AD code in on the EDF. "" means not provided. No strict format: a wrong-format rejection is worse than accepting it. */
 const adCodeSchema = z.string().trim().transform((s) => s.toUpperCase().replace(/\s+/g, "")).pipe(z.string().max(20, "AD code is too long")).default("");
 export const saveBankInput = z.object({ id: id.optional(), name: trimmed, adCode: adCodeSchema });

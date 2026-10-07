@@ -12,7 +12,7 @@ export type { MemoryMailer } from "./mailer";
 export { ForbiddenError, NotFoundError, ValidationError, UnauthenticatedError, toWireError, UNKNOWN_ERROR } from "./errors";
 export { toWire } from "./wire";
 
-export { getOnboarding, saveProfile, saveBank } from "./onboarding";
+export { getOnboarding, saveProfile, saveBank, suggestProfileFromInvoice } from "./onboarding";
 export { requestUpload, confirmUpload, runIngest, sweepStuckIngests, requeueStuckIngests, listDocuments } from "./uploads";
 export { getMonthState, editField, decideAllocation, linkNoc } from "./review";
 export { generatePack, getPackDownloads, markPackSubmitted, listPacks, layoutIdFor, isPlaceholderLayout } from "./packs";

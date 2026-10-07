@@ -1,9 +1,9 @@
 // Rules-based reader for the text layer of invoices, FIRAs and NOCs (client-only v0: no network, no LLM).
 // Pure and isomorphic: it takes text lines and returns an IngestResult. Every extracted value gets
 // LOCAL_CONFIDENCE, which is below FLAG_THRESHOLD (0.9), so the user must review each one before a pack is built.
-import type { Field, InvoiceFacts, IsoDate, Money, PaymentFacts } from "@korra/core";
+import { findCatalogBankByIfsc, panFromGstin, type Field, type InvoiceFacts, type IsoDate, type Money, type PaymentFacts } from "@korra/core";
 import { field, missing, parseAmount, parseDate, parseRate } from "./normalize";
-import type { IngestResult } from "./types";
+import type { IngestResult, IssuerFacts } from "./types";
 
 export const LOCAL_CONFIDENCE = 0.6;
 export const SCANNED_WARNING = "Scanned or image file: enter the details by hand";
@@ -206,6 +206,75 @@ function sacCode(lines: string[]): string | null {
   return (tagged ?? lines.find((l) => re.test(l)))?.match(re)?.[1] ?? null;
 }
 
+/* ------------------------------ issuer (the exporter) ------------------------------ */
+
+// On an export invoice the only Indian GSTIN and IFSC are the exporter's: the client is abroad.
+const GSTIN_IN_TEXT = /(?<![A-Z0-9])\d{2}[A-Z]{5}\d{4}[A-Z][A-Z0-9]Z[A-Z0-9](?![A-Z0-9])/;
+const IFSC_IN_TEXT = /(?<![A-Z0-9])[A-Z]{4}0[A-Z0-9]{6}(?![A-Z0-9])/;
+const PAN_LABELLED = /\bPAN\b(?:\s*(?:no\.?|number|card))?\s*[:#\-–]?\s*([A-Z]{5}\d{4}[A-Z])(?![A-Z0-9])/;
+// A label that ends the exporter's header block: invoice facts, the client, tax ids, contact details, the table.
+const HEADER_STOP = /^(?:(?:tax\s+|export\s+|commercial\s+)?invoice|bill(?:ed)?\s+(?:to|by)|ship(?:ped)?\s+to|sold\s+to|client|customer|date|due|gst(?:in)?|pan|iec|lut|cin|sac|hsn|e-?mail|phone|tel|mobile|mob|web(?:site)?|description|s\.?\s*no|sr|from|seller|supplier|exporter)\b|^to\s*:|^www\.|@|^\+?\d[\d\s-]{7,}$/i;
+const TITLE_LINE = /^(?:(?:tax|export|commercial|proforma)\s+)?invoice$|^original(?:\s+for\s+recipient)?$|^bill\s+of\s+supply$|^letter\s+of\s+undertaking$/i;
+const FROM_LABEL = /^(?:from|seller|supplier|exporter|issued\s+by|billed\s+by|service\s+provider)\b\s*[:\-–]?\s*(.*)$/i;
+// Two-column layouts put the invoice facts on the same line as the name: cut where the next label starts.
+const CUT_AT_LABEL = /\s+(?:invoice\s*(?:no|number|date|#)|date\b|gst|pan\b|iec\b|bill\s+to)\b.*$/i;
+
+function issuerHeader(lines: string[], anchored: boolean): { name: string | null; address: string | null } {
+  const none = { name: null, address: null };
+  let start = -1;
+  for (let i = 0; i < Math.min(lines.length, 12); i++) {
+    const from = lines[i]!.match(FROM_LABEL);
+    if (from) {
+      start = (from[1] ?? "").trim() ? i : i + 1;
+      if ((from[1] ?? "").trim()) lines = [...lines.slice(0, i), from[1]!.trim(), ...lines.slice(i + 1)];
+      break;
+    }
+  }
+  if (start < 0) {
+    if (!anchored) return none; // no "From" label and no GSTIN near the top: do not guess which block is ours
+    start = 0;
+    while (start < 2 && TITLE_LINE.test(lines[start] ?? "")) start++;
+  }
+  const first = lines[start];
+  if (!first || HEADER_STOP.test(first)) return none;
+  const name = first.replace(CUT_AT_LABEL, "").trim();
+  if (!/[A-Za-z]{2}/.test(name) || /^\d/.test(name)) return none;
+  const address: string[] = [];
+  for (const l of lines.slice(start + 1, start + 5)) {
+    if (HEADER_STOP.test(l) || TITLE_LINE.test(l)) break;
+    const c = l.replace(CUT_AT_LABEL, "").trim();
+    if (!c) break;
+    address.push(c);
+  }
+  const country = countryOf([name, ...address]);
+  if (country && country !== "IN") return none; // a foreign header is the client's or a platform's, not the exporter's
+  return { name, address: address.length ? address.join(", ") : null };
+}
+
+function readIssuer(lines: string[], sac: string | null): IssuerFacts {
+  const gstin = lines.map((l) => l.match(GSTIN_IN_TEXT)?.[0]).find(Boolean) ?? null;
+  const pan = (gstin && panFromGstin(gstin)) ?? lines.map((l) => l.match(PAN_LABELLED)?.[1]).find(Boolean) ?? null;
+
+  const ifscLine = lines.findIndex((l) => /\bIFS\s*C?\b/i.test(l));
+  const ifscNear = ifscLine >= 0 ? [lines[ifscLine]!, lines[ifscLine + 1] ?? ""].map((l) => l.match(IFSC_IN_TEXT)?.[0]).find(Boolean) : undefined;
+  const ifsc = ifscNear ?? lines.map((l) => l.match(IFSC_IN_TEXT)?.[0]).find((m) => m && findCatalogBankByIfsc(m)) ?? null;
+
+  const bankHit = labelled(lines, /\b(?:bank\s+name|name\s+of\s+(?:the\s+)?bank|beneficiary\s+bank|bankers?)\b/);
+  const bankName = bankHit?.value.replace(/\s+(?:a\/c|account|ifsc|branch|swift|address)\b.*$/i, "").trim() ?? "";
+
+  const anchored = lines.slice(0, 12).some((l) => GSTIN_IN_TEXT.test(l) || PAN_LABELLED.test(l));
+  const head = issuerHeader(lines, anchored);
+  return {
+    legalName: f(head.name),
+    address: f(head.address),
+    gstin: f(gstin),
+    pan: f(pan),
+    sacCode: f(sac),
+    ifsc: f(ifsc),
+    bankName: f(bankName && bankName.length <= 80 && /[A-Za-z]{3}/.test(bankName) ? bankName : null),
+  };
+}
+
 function readInvoice(lines: string[]): IngestResult {
   const text = lines.join("\n");
   const docCcy = findCurrency(text);
@@ -240,7 +309,7 @@ function readInvoice(lines: string[]): IngestResult {
   if (!invoiceNo) warnings.push("Could not find the invoice number.");
   if (!invoiceDate) warnings.push("Could not find the invoice date.");
   if (!total) warnings.push("Could not find the invoice total.");
-  return { kind: "invoice", rail: null, invoices: [inv], payments: [], warnings };
+  return { kind: "invoice", rail: null, invoices: [inv], payments: [], issuer: readIssuer(lines, sac), warnings };
 }
 
 /* ------------------------------ FIRA ------------------------------ */

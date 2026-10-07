@@ -21,6 +21,7 @@ import type {
   OnboardingWire,
   PackDownloadsWire,
   PackWire,
+  ProfileSuggestionWire,
   RequestUploadInput,
   SaveBankInput,
   SaveProfileInput,
@@ -47,6 +48,12 @@ export interface KorraApi {
   getOnboarding(): Promise<OnboardingWire>;
   saveProfile(input: SaveProfileInput): Promise<ExporterProfileWire>;
   saveBank(input: SaveBankInput): Promise<AdBankWire>;
+  /**
+   * Reads one of the user's own export invoices (PDF or image) and suggests profile values from its issuer block.
+   * Parse only: the file is not stored and nothing is saved. A file that cannot be read gives an all-null suggestion
+   * (it only throws for real failures, like a lost connection).
+   */
+  extractProfileFromInvoice(file: File): Promise<ProfileSuggestionWire>;
 
   getMonthState(month: string): Promise<MonthStateWire>;
   /**

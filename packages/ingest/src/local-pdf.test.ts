@@ -170,3 +170,63 @@ describe("local PDF extractor", () => {
     expect(img.kind).toBe("unknown");
   });
 });
+
+describe("local rules: the issuer (exporter) of an invoice", () => {
+  const issuer = (lines: string[]) => extractFromText(lines, "invoice").issuer!;
+  const values = (i: ReturnType<typeof issuer>) => Object.fromEntries(Object.entries(i).map(([k, v]) => [k, v.value]));
+
+  it("reads the header block, the GSTIN, the PAN inside it and the SAC", () => {
+    expect(values(issuer(INVOICE))).toEqual({
+      legalName: "JANE DEV CONSULTING", address: "12 MG Road, Bengaluru 560001, India", gstin: "29ABCDE1234F1Z5", pan: "ABCDE1234F",
+      sacCode: "998314", ifsc: null, bankName: null,
+    });
+  });
+
+  it("reads a labelled From block, a printed PAN, the bank name and the IFSC", () => {
+    const i = issuer([
+      "Tax Invoice",
+      "Invoice No: INV-9",
+      "From:",
+      "Jane Dev Consulting Pvt Ltd",
+      "12 MG Road",
+      "Bengaluru, Karnataka 560001",
+      "India",
+      "GSTIN: 29ABCDE1234F1Z5",
+      "PAN: ABCDE1234F",
+      "Bill To:",
+      "Acme Corp",
+      "Austin, TX 78701, United States",
+      "Total USD 1,500.00",
+      "Bank Name: HDFC Bank Ltd. A/c No 50100123456789",
+      "IFSC Code: HDFC0001234",
+    ]);
+    expect(values(i)).toMatchObject({
+      legalName: "Jane Dev Consulting Pvt Ltd", address: "12 MG Road, Bengaluru, Karnataka 560001, India",
+      gstin: "29ABCDE1234F1Z5", pan: "ABCDE1234F", ifsc: "HDFC0001234", bankName: "HDFC Bank Ltd.",
+    });
+  });
+
+  it("cuts a name at the invoice facts printed on the same line", () => {
+    const i = issuer(["Jane Dev Consulting Invoice No: INV-1", "12 MG Road, Pune India Invoice Date: 02 Sep 2026", "GSTIN: 27ABCDE1234F1Z5", "Bill To:", "Acme Corp"]);
+    expect(values(i)).toMatchObject({ legalName: "Jane Dev Consulting", address: "12 MG Road, Pune India", gstin: "27ABCDE1234F1Z5", pan: "ABCDE1234F" });
+  });
+
+  it("maps a lone IFSC of a known bank, but ignores one from an unknown bank unless it is labelled", () => {
+    expect(issuer(["Pay to ICIC0000123 Mumbai", "Invoice No: 1"]).ifsc.value).toBe("ICIC0000123");
+    expect(issuer(["Pay to FDRL0001234 Kochi", "Invoice No: 1"]).ifsc.value).toBeNull();
+    expect(issuer(["IFSC: FDRL0001234", "Invoice No: 1"]).ifsc.value).toBe("FDRL0001234");
+  });
+
+  it("finds nothing, and invents nothing, without an anchor, or when the top block is foreign", () => {
+    expect(values(issuer(DEEL))).toEqual({ legalName: null, address: null, gstin: null, pan: null, sacCode: "998313", ifsc: null, bankName: null });
+    expect(values(issuer(["Random letter from a vendor with no figures at all in it, really none"]))).toMatchObject({ legalName: null, address: null, gstin: null, pan: null });
+    const foreign = issuer(["Deel Inc.", "650 California St, San Francisco, CA 94108, United States", "GSTIN: 29ABCDE1234F1Z5", "Invoice No: 1"]);
+    expect(values(foreign)).toMatchObject({ legalName: null, address: null, gstin: "29ABCDE1234F1Z5", pan: "ABCDE1234F" });
+  });
+
+  it("gives every value the local confidence, and a scan or an image has no issuer", async () => {
+    for (const v of Object.values(issuer(INVOICE))) if (v.value !== null) expect(v).toMatchObject({ confidence: LOCAL_CONFIDENCE, source: "extracted" });
+    expect(extractFromText([]).issuer).toBeUndefined();
+    expect((await extractor(INVOICE).extract({ bytes: PNG, mimeType: "image/png", filename: "scan.png" })).issuer).toBeUndefined();
+  });
+});

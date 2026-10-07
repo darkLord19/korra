@@ -1,7 +1,7 @@
 import {
   confirmAllFields, confirmUpload, createInvoiceManually, createPaymentManually, decideAllocation, editField, generatePack,
   getMonthState, getOnboarding, getPackDownloads, getTracker, linkNoc, listDocuments, listPacks, markPackSubmitted, requestUpload,
-  saveBank, saveProfile, toWireError, UNKNOWN_ERROR,
+  saveBank, saveProfile, suggestProfileFromInvoice, toWireError, UNKNOWN_ERROR,
   type Ctx,
 } from "@korra/backend";
 import { isGuideFile, type RequestUploadInput } from "@korra/backend/schemas";
@@ -65,6 +65,9 @@ export function createLocalApi({ ctx, blobs, ingest, onPackGenerated, resumeEver
     getOnboarding: () => call(() => getOnboarding(ctx)),
     saveProfile: (input) => call(() => saveProfile(ctx, input)),
     saveBank: (input) => call(() => saveBank(ctx, input)),
+    // The on-device PDF reader (pdf.js + rules) runs in this tab; the file is neither stored nor sent anywhere.
+    extractProfileFromInvoice: (file) =>
+      call(async () => suggestProfileFromInvoice(ctx, { bytes: new Uint8Array(await file.arrayBuffer()), mimeType: mimeOf(file) ?? file.type, filename: file.name })),
 
     getMonthState(month) {
       // Screens poll this while documents are being read, so it doubles as the "no cron" backstop (throttled).

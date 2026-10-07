@@ -3,4 +3,4 @@
 export { createIngester } from "./ingester";
 export { createFakeExtractor } from "./fake";
 export { IngestError } from "./types";
-export type { IngestDoc, IngestResult, LlmExtractor } from "./types";
+export type { IngestDoc, IngestResult, IssuerFacts, LlmExtractor } from "./types";

@@ -3,11 +3,15 @@ import type { ReactNode } from "react";
 import type { OnboardingWire } from "@korra/backend/schemas";
 import { Alert, Card, CardBody, CardHeader } from "../components";
 import { useApi, useNav } from "../context";
-import { ProfileForm } from "../forms/ProfileForm";
+import { ProfileForm, type InvoiceHandoff } from "../forms/ProfileForm";
 import { useLoaded } from "./useLoaded";
 
 /** First-run setup: the exporter profile and the bank, in one form. Saving the profile goes to the app's home. */
-export function OnboardingScreen({ initial, step, onSaved }: { initial?: OnboardingWire; step?: ReactNode; onSaved?: () => void }) {
+export function OnboardingScreen({ initial, step, onSaved }: {
+  initial?: OnboardingWire; step?: ReactNode;
+  /** Called once the profile is saved, with the invoice the form was filled from (if any), before going to the app's home. */
+  onSaved?: (invoice?: InvoiceHandoff) => void;
+}) {
   const api = useApi();
   const nav = useNav();
   const { data: ob, error } = useLoaded<OnboardingWire>(() => api.getOnboarding(), initial, "onboarding");
@@ -25,8 +29,9 @@ export function OnboardingScreen({ initial, step, onSaved }: { initial?: Onboard
           <ProfileForm
             profile={ob.profile}
             banks={ob.banks}
-            onSaved={() => {
-              onSaved?.();
+            fillFromInvoice
+            onSaved={(invoice) => {
+              onSaved?.(invoice);
               nav.push(nav.hrefs.home());
             }}
           />

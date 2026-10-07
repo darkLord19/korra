@@ -50,6 +50,7 @@ export function fakeApi(over: Partial<KorraApi> = {}, capabilities: Partial<Korr
     getOnboarding: unused("getOnboarding"),
     saveProfile: unused("saveProfile"),
     saveBank: unused("saveBank"),
+    extractProfileFromInvoice: unused("extractProfileFromInvoice"),
     getMonthState: unused("getMonthState"),
     uploadFile: unused("uploadFile"),
     listDocuments: unused("listDocuments"),

@@ -1,4 +1,4 @@
-import type { RequestUploadInput } from "@korra/backend/schemas";
+import type { ProfileSuggestionWire, RequestUploadInput } from "@korra/backend/schemas";
 import { KorraApiError, UNSUPPORTED_FILE_MESSAGE, mimeOf, type KorraApi } from "@korra/ui";
 import type { ActionResult } from "@/lib/action-result";
 import {
@@ -23,6 +23,16 @@ export const serverApi: KorraApi = {
   getOnboarding: () => call(getOnboardingAction()),
   saveProfile: (input) => call(saveProfileAction(input)),
   saveBank: (input) => call(saveBankAction(input)),
+  // A route handler, not a server action: a server action's body is limited to 1 MB and an invoice can be 20 MB.
+  async extractProfileFromInvoice(file) {
+    const body = new FormData();
+    body.append("file", new File([file], file.name, { type: mimeOf(file) ?? file.type }));
+    const res = await fetch("/api/profile-from-invoice", { method: "POST", body }).catch(() => null);
+    const r = (await res?.json().catch(() => null)) as ActionResult<ProfileSuggestionWire> | null;
+    if (!r) throw new KorraApiError({ kind: "unknown", message: "Could not read this file. Try again." });
+    if (r.ok) return r.data;
+    throw new KorraApiError(r.error);
+  },
 
   getMonthState: (month) => call(getMonthStateAction(month)),
   listDocuments: (month) => call(listDocumentsAction(month)),

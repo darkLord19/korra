@@ -1,20 +1,26 @@
 "use client";
-import { useRef, useState, useTransition, type FormEvent } from "react";
+import { useEffect, useRef, useState, useTransition, type FormEvent } from "react";
 import { BANK_CATALOG, OTHER_BANK_KEY, findCatalogBank, panFromGstin } from "@korra/core";
-import type { AdBankWire, ExporterProfileWire } from "@korra/backend/schemas";
+import type { AdBankWire, ExporterProfileWire, ProfileSuggestionWire } from "@korra/backend/schemas";
 import { Alert, Button, Field, Input, Select, Textarea } from "../components";
 import { useApi } from "../context";
 import { toFormErrors, type FormErrors } from "../errors";
+import { COULDNT_READ, InvoiceFill } from "./InvoiceFill";
 
 const str = (fd: FormData, k: string) => String(fd.get(k) ?? "");
 
 const AD_HINT = "Usually 7 digits, from your bank's AD code letter. Not your IFSC. Leave blank if you don't have it; your bank can fill it in.";
 const norm = (s: string) => s.trim().toLowerCase();
 
-export function ProfileForm({ profile, banks, submitLabel = "Save and continue", onSaved }: {
+/** The invoice the form was filled from, so an app can file it once the profile is saved. `month` is the invoice date's month. */
+export interface InvoiceHandoff { file: File; month: string | null }
+
+export function ProfileForm({ profile, banks, submitLabel = "Save and continue", fillFromInvoice = false, onSaved }: {
   profile: ExporterProfileWire | null; banks: AdBankWire[]; submitLabel?: string;
-  /** Called after the profile was saved (onboarding goes to the app; settings reloads). */
-  onSaved?: (() => void) | undefined;
+  /** Offer "Have an invoice handy? Drop it here to fill this in" (onboarding). */
+  fillFromInvoice?: boolean;
+  /** Called after the profile was saved (onboarding goes to the app; settings reloads). `invoice` is set when the form was filled from one. */
+  onSaved?: ((invoice?: InvoiceHandoff) => void) | undefined;
 }) {
   const api = useApi();
   const [errors, setErrors] = useState<FormErrors>({});
@@ -37,11 +43,42 @@ export function ProfileForm({ profile, banks, submitLabel = "Save and continue",
   const [bankKey, setBankKey] = useState(current ? (currentEntry?.key ?? OTHER_BANK_KEY) : "");
   const [otherName, setOtherName] = useState(current && !currentEntry ? current.name : "");
   const [adCode, setAdCode] = useState(current?.adCode ?? "");
+  const [invoice, setInvoice] = useState<InvoiceHandoff | null>(null);
   const made = useRef(new Map<string, string>()); // banks created by this form, in case `banks` has not refreshed yet
   const entry = BANK_CATALOG.find((b) => b.key === bankKey);
   const bankName = (bankKey === OTHER_BANK_KEY ? otherName : entry?.name ?? "").trim();
   const existing = (name: string) => banks.find((b) => norm(b.name) === norm(name));
   const hint = entry?.adCodeHint && !adCode.trim() ? `${AD_HINT} ${entry.name}'s own EDF form uses ${entry.adCodeHint}. Confirm with your branch before using it.` : AD_HINT;
+
+  // What the form holds now, for `fill` to read after the invoice has been read (the user may have typed meanwhile).
+  const latest = useRef({ legalName, address, gstin, pan, bankKey, adCode });
+  useEffect(() => { latest.current = { legalName, address, gstin, pan, bankKey, adCode }; });
+
+  /** Puts a suggestion into the EMPTY fields only, and says which. Nothing is saved. */
+  function fill(s: ProfileSuggestionWire, file: File): { tone: "success" | "info" | "warning"; message: string } {
+    const c = latest.current;
+    const empty = (v: string) => !v.trim();
+    const filled: string[] = [];
+    if (s.legalName && empty(c.legalName)) { setLegalName(s.legalName); filled.push("name"); }
+    if (s.address && empty(c.address)) { setAddress(s.address); filled.push("address"); }
+    const g = empty(c.gstin) ? s.gstin : null;
+    if (g) { setGstin(g); filled.push("GSTIN"); }
+    const p = empty(c.pan) ? (panFromGstin(c.gstin) ?? panFromGstin(g ?? "") ?? s.pan) : null;
+    if (p) { setPan(p); filled.push("PAN"); }
+    if (empty(c.bankKey)) {
+      const k = BANK_CATALOG.find((b) => b.key === s.bankKey);
+      if (k || s.otherBankName) {
+        setBankKey(k ? k.key : OTHER_BANK_KEY);
+        if (k && empty(c.adCode)) setAdCode(existing(k.name)?.adCode ?? "");
+        if (!k) setOtherName(s.otherBankName!);
+        filled.push("bank");
+      }
+    }
+    if (![s.legalName, s.address, s.gstin, s.pan, s.bankKey, s.otherBankName].some(Boolean)) return { tone: "warning", message: COULDNT_READ };
+    setInvoice({ file, month: s.invoiceMonth });
+    if (filled.length === 0) return { tone: "info", message: `Read ${file.name}, but everything it covers is already filled in.` };
+    return { tone: "success", message: `Filled from ${file.name}: ${filled.join(", ")}. Check them before saving.` };
+  }
 
   function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -63,7 +100,7 @@ export function ProfileForm({ profile, banks, submitLabel = "Save and continue",
           defaultAdBankId: bank.id,
         });
         setSaved(true);
-        onSaved?.();
+        onSaved?.(invoice ?? undefined);
       } catch (err) {
         setErrors(toFormErrors(err));
       }
@@ -72,6 +109,7 @@ export function ProfileForm({ profile, banks, submitLabel = "Save and continue",
 
   return (
     <form onSubmit={submit} className="space-y-4">
+      {fillFromInvoice && <InvoiceFill apply={fill} />}
       <Field id="legalName" label="Legal name" hint="As on your PAN and GST registration." error={fe.legalName}>
         <Input id="legalName" name="legalName" value={legalName} onChange={(e) => setLegalName(e.target.value)} required aria-invalid={!!fe.legalName} autoComplete="organization" />
       </Field>

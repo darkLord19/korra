@@ -403,6 +403,119 @@ describe("profile form: choosing a bank", () => {
   });
 });
 
+describe("profile form: filling it from an invoice", () => {
+  const NONE = { legalName: null, address: null, gstin: null, pan: null, sacCode: null, bankKey: null, otherBankName: null, invoiceMonth: null };
+  const FOUND = { legalName: "Jane Dev Consulting", address: "12 MG Road, Bengaluru 560001, India", gstin: "29ABCDE1234F1Z5", pan: "ABCDE1234F", sacCode: "998314", bankKey: "hdfc", otherBankName: null, invoiceMonth: "2026-09" };
+  const pdf = (name = "invoice-042.pdf") => new File(["%PDF-1.4"], name, { type: "application/pdf" });
+  const drop = (file: File) => userEvent.upload(screen.getByTestId("invoice-fill-input"), file);
+  const val = (label: string | RegExp) => (screen.getByLabelText(label) as HTMLInputElement).value;
+  const form = (suggestion: object, props: Partial<Parameters<typeof ProfileForm>[0]> = {}, banks: Parameters<typeof ProfileForm>[0]["banks"] = []) => {
+    const extractProfileFromInvoice = vi.fn().mockResolvedValue(suggestion);
+    const saveProfile = vi.fn().mockResolvedValue({});
+    const saveBank = vi.fn().mockResolvedValue({ id: "b1", name: "HDFC Bank", adCode: "" });
+    render(<Wrap api={fakeApi({ extractProfileFromInvoice, saveProfile, saveBank })}><ProfileForm profile={null} banks={banks} fillFromInvoice {...props} /></Wrap>);
+    return { extractProfileFromInvoice, saveProfile, saveBank };
+  };
+
+  it("is offered on the onboarding screen only, not in settings", async () => {
+    render(<Wrap api={fakeApi({ getOnboarding: vi.fn().mockResolvedValue({ profile: null, banks: [], complete: false }) })}><OnboardingScreen /></Wrap>);
+    expect(await screen.findByText("Have an invoice handy? Drop it here to fill this in")).toBeTruthy();
+    render(<Wrap api={fakeApi()}><ProfileForm profile={null} banks={[]} /></Wrap>);
+    expect(screen.getAllByTestId("invoice-fill-input")).toHaveLength(1);
+  });
+
+  it("fills the empty fields, names them, and saves nothing", async () => {
+    const { saveProfile, saveBank } = form(FOUND);
+    await drop(pdf());
+    expect(await screen.findByText("Filled from invoice-042.pdf: name, address, GSTIN, PAN, bank. Check them before saving.")).toBeTruthy();
+    expect(val("Legal name")).toBe("Jane Dev Consulting");
+    expect(val("Registered address")).toBe("12 MG Road, Bengaluru 560001, India");
+    expect(val("GSTIN")).toBe("29ABCDE1234F1Z5");
+    expect(val("PAN")).toBe("ABCDE1234F");
+    expect(val("Which bank receives your foreign payments?")).toBe("hdfc");
+    expect(saveProfile).not.toHaveBeenCalled();
+    expect(saveBank).not.toHaveBeenCalled();
+  });
+
+  it("fills ONLY empty fields: what the person typed is left alone", async () => {
+    form(FOUND);
+    await userEvent.type(screen.getByLabelText("Legal name"), "My Own Name");
+    await userEvent.type(screen.getByLabelText("PAN"), "ZZZZZ9999Z");
+    await userEvent.selectOptions(screen.getByLabelText("Which bank receives your foreign payments?"), "Axis Bank");
+    await drop(pdf());
+    expect(await screen.findByText("Filled from invoice-042.pdf: address, GSTIN. Check them before saving.")).toBeTruthy();
+    expect(val("Legal name")).toBe("My Own Name");
+    expect(val("PAN")).toBe("ZZZZZ9999Z");
+    expect(val("Which bank receives your foreign payments?")).toBe("axis");
+    expect(val("GSTIN")).toBe("29ABCDE1234F1Z5");
+    expect(screen.getByText(/Doesn't match the PAN inside your GSTIN \(ABCDE1234F\)\./)).toBeTruthy(); // the soft warning still works
+  });
+
+  it("derives the PAN from a GSTIN the person already typed, and fills the AD code of an existing bank", async () => {
+    form({ ...FOUND, gstin: null, pan: null }, {}, [{ id: "old", name: "HDFC Bank", adCode: "6390009" }]);
+    await userEvent.type(screen.getByLabelText("GSTIN"), "29ABCDE1234F1Z5");
+    await userEvent.clear(screen.getByLabelText("PAN"));
+    await drop(pdf());
+    expect(await screen.findByText("Filled from invoice-042.pdf: name, address, PAN, bank. Check them before saving.")).toBeTruthy();
+    expect(val("PAN")).toBe("ABCDE1234F");
+    expect(val(/^AD code/)).toBe("6390009");
+  });
+
+  it("puts a bank that is not in the catalog under 'Other bank'", async () => {
+    form({ ...NONE, bankKey: null, otherBankName: "Federal Bank" });
+    await drop(pdf());
+    expect(await screen.findByText("Filled from invoice-042.pdf: bank. Check them before saving.")).toBeTruthy();
+    expect(val("Which bank receives your foreign payments?")).toBe("other");
+    expect(val("Bank name")).toBe("Federal Bank");
+  });
+
+  it("says so when nothing could be read, when reading fails, and when the file cannot be an invoice", async () => {
+    const { extractProfileFromInvoice } = form(NONE);
+    await drop(pdf("scan.pdf"));
+    expect(await screen.findByText("Couldn't read details from this file; fill them in by hand.")).toBeTruthy();
+    expect(val("Legal name")).toBe("");
+    extractProfileFromInvoice.mockRejectedValueOnce(new KorraApiError({ kind: "unknown", message: "boom" }));
+    await drop(pdf("again.pdf"));
+    expect(await screen.findByText("Couldn't read details from this file; fill them in by hand.")).toBeTruthy();
+    const pick = (file: File) => fireEvent.change(screen.getByTestId("invoice-fill-input"), { target: { files: [file] } }); // bypasses the picker's accept filter, like a dropped file
+    pick(new File(["a,b"], "data.csv", { type: "text/csv" }));
+    expect(await screen.findByText("Use a PDF of your invoice.")).toBeTruthy();
+    pick(new File([new Uint8Array(20 * 1024 * 1024 + 1)], "huge.pdf", { type: "application/pdf" }));
+    expect(await screen.findByText("Files are limited to 20 MB.")).toBeTruthy();
+    expect(extractProfileFromInvoice).toHaveBeenCalledTimes(2);
+  });
+
+  it("when every field it covers is already filled, says that instead of 'couldn't read'", async () => {
+    form({ ...FOUND, sacCode: null });
+    for (const [label, v] of [["Legal name", "A"], ["Registered address", "B"], ["GSTIN", "29ABCDE1234F1Z5"]] as const) await userEvent.type(screen.getByLabelText(label), v);
+    await userEvent.selectOptions(screen.getByLabelText("Which bank receives your foreign payments?"), "Axis Bank");
+    await drop(pdf());
+    expect(await screen.findByText("Read invoice-042.pdf, but everything it covers is already filled in.")).toBeTruthy();
+  });
+
+  it("hands the invoice and its month to onSaved, so the app can file it", async () => {
+    const onSaved = vi.fn();
+    const { saveProfile } = form(FOUND, { onSaved });
+    const file = pdf();
+    await drop(file);
+    await screen.findByText(/^Filled from/);
+    await userEvent.click(screen.getByRole("button", { name: "Save and continue" }));
+    await waitFor(() => expect(onSaved).toHaveBeenCalledWith({ file, month: "2026-09" }));
+    expect(saveProfile).toHaveBeenCalledWith(expect.objectContaining({ legalName: "Jane Dev Consulting", pan: "ABCDE1234F" }));
+  });
+
+  it("hands over nothing when no invoice was read", async () => {
+    const onSaved = vi.fn();
+    form(NONE, { onSaved });
+    await drop(pdf());
+    await screen.findByText(/Couldn't read/);
+    for (const [label, v] of [["Legal name", "Jane"], ["Registered address", "12 MG Road"], ["GSTIN", "29ABCDE1234F1Z5"]] as const) await userEvent.type(screen.getByLabelText(label), v);
+    await userEvent.selectOptions(screen.getByLabelText("Which bank receives your foreign payments?"), "HDFC Bank");
+    await userEvent.click(screen.getByRole("button", { name: "Save and continue" }));
+    await waitFor(() => expect(onSaved).toHaveBeenCalledWith(undefined));
+  });
+});
+
 describe("onboarding screen", () => {
   it("renders the optional step indicator", async () => {
     const onboarding = { profile: null, banks: [bank], complete: false };

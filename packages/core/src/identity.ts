@@ -7,3 +7,6 @@ export function panFromGstin(gstin: string): string | null {
   const g = gstin.trim().toUpperCase();
   return GSTIN_RE.test(g) ? g.slice(2, 12) : null;
 }
+
+/** IFSC: 4 letters (the bank), a zero, 6 characters (the branch). */
+export const IFSC_RE = /^[A-Z]{4}0[A-Z0-9]{6}$/;

@@ -1,11 +1,12 @@
-import { beforeEach, describe, expect, it } from "vitest";
-import { IngestError } from "@korra/ingest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { IngestError, createIngester, type IssuerFacts } from "@korra/ingest";
+import { createClaudeExtractor } from "@korra/ingest/server";
 import { createRepos } from "@korra/db";
 import {
   ForbiddenError, NotFoundError, ValidationError,
   acceptCaInvite, confirmUpload, createInvoiceManually, decideAllocation, deleteAccount, editField, generatePack, getMonthState,
   getCaInvite, getOnboarding, getPackDownloads, getTracker, inviteCa, isPlaceholderLayout, layoutIdFor, linkNoc, listCaClients, listMyCas,
-  markPackSubmitted, requestUpload, revokeCa, runDailyNotifications, requeueStuckIngests, runIngest, saveBank, saveProfile, sweepStuckIngests, toWire,
+  markPackSubmitted, requestUpload, revokeCa, runDailyNotifications, requeueStuckIngests, runIngest, saveBank, saveProfile, suggestProfileFromInvoice, sweepStuckIngests, toWire,
 } from "./index";
 import { caCtx, createTestDeps, createTestOwner, simulateBrowserPut, type TestDeps } from "./testing";
 import { PDF, deelCsv, firaResult, invoiceResult, f, onboard, upload, usd } from "./helpers.test-util";
@@ -57,6 +58,70 @@ describe("onboarding", () => {
     const bank = await saveBank(o.ctx, { name: "HDFC Bank", adCode: "6390001" });
     const cleared = await saveBank(o.ctx, { id: bank.id, name: "HDFC Bank", adCode: "" });
     expect(cleared).toEqual({ id: bank.id, name: "HDFC Bank", adCode: "" });
+  });
+});
+
+describe("suggestProfileFromInvoice", () => {
+  const issuer = (over: Partial<Record<keyof IssuerFacts, string | null>> = {}): IssuerFacts => {
+    const base = { legalName: "Jane Dev Consulting", address: "12 MG Road, Bengaluru 560001, India", gstin: "29ABCDE1234F1Z5", pan: null, sacCode: "998314", ifsc: "HDFC0001234", bankName: null, ...over };
+    return Object.fromEntries(Object.entries(base).map(([k, v]) => [k, f<string>(v, 0.6)])) as unknown as IssuerFacts;
+  };
+  const file = (filename = "inv.pdf") => ({ bytes: PDF, mimeType: "application/pdf", filename });
+  const EMPTY = { legalName: null, address: null, gstin: null, pan: null, sacCode: null, bankKey: null, otherBankName: null, invoiceMonth: null };
+
+  it("maps the issuer to profile values: PAN from the GSTIN, bank from the IFSC, month from the invoice date", async () => {
+    const o = await createTestOwner(deps);
+    deps.fixtures["inv.pdf"] = { ...invoiceResult(), issuer: issuer() };
+    expect(await suggestProfileFromInvoice(o.ctx, file())).toEqual({
+      legalName: "Jane Dev Consulting", address: "12 MG Road, Bengaluru 560001, India", gstin: "29ABCDE1234F1Z5", pan: "ABCDE1234F",
+      sacCode: "998314", bankKey: "hdfc", otherBankName: null, invoiceMonth: "2026-09",
+    });
+  });
+
+  it("stores nothing: no document, no invoice, no profile", async () => {
+    const o = await createTestOwner(deps);
+    deps.fixtures["inv.pdf"] = { ...invoiceResult(), issuer: issuer() };
+    await suggestProfileFromInvoice(o.ctx, file());
+    const r = createRepos(deps.db, o.ctx.actor);
+    expect(await r.documents.list()).toEqual([]);
+    expect(await r.invoices.list()).toEqual([]);
+    expect(await r.profile.get()).toBeNull();
+  });
+
+  it("falls back to the bank name (whole-name match, else 'other'), ignores malformed ids and fakes no PAN", async () => {
+    const o = await createTestOwner(deps);
+    deps.fixtures["a.pdf"] = { ...invoiceResult(), issuer: issuer({ ifsc: null, bankName: "Kotak Mahindra Bank Limited" }) };
+    expect(await suggestProfileFromInvoice(o.ctx, file("a.pdf"))).toMatchObject({ bankKey: "kotak", otherBankName: null });
+    deps.fixtures["b.pdf"] = { ...invoiceResult(), issuer: issuer({ ifsc: "FDRL0001234", bankName: "Federal Bank" }) };
+    expect(await suggestProfileFromInvoice(o.ctx, file("b.pdf"))).toMatchObject({ bankKey: null, otherBankName: "Federal Bank" });
+    deps.fixtures["c.pdf"] = { ...invoiceResult(), issuer: issuer({ gstin: "GB123456789", pan: "nope", ifsc: "12345", sacCode: "abc" }) };
+    expect(await suggestProfileFromInvoice(o.ctx, file("c.pdf"))).toMatchObject({ gstin: null, pan: null, sacCode: null, bankKey: null });
+  });
+
+  it("an unreadable file, or one with no issuer, is an empty suggestion rather than an error", async () => {
+    const o = await createTestOwner(deps);
+    expect(await suggestProfileFromInvoice(o.ctx, file("no-fixture.pdf"))).toEqual(EMPTY);
+    deps.fixtures["plain.pdf"] = invoiceResult();
+    expect(await suggestProfileFromInvoice(o.ctx, file("plain.pdf"))).toEqual({ ...EMPTY, invoiceMonth: "2026-09" });
+  });
+
+  it("only takes a PDF or an image of up to 20 MB, and only from the owner", async () => {
+    const o = await createTestOwner(deps);
+    await expect(suggestProfileFromInvoice(o.ctx, { ...file(), mimeType: "text/csv" })).rejects.toBeInstanceOf(ValidationError);
+    await expect(suggestProfileFromInvoice(o.ctx, { ...file(), bytes: new Uint8Array(0) })).rejects.toBeInstanceOf(ValidationError);
+    await expect(suggestProfileFromInvoice(o.ctx, { ...file(), bytes: new Uint8Array(20 * 1024 * 1024 + 1) })).rejects.toBeInstanceOf(ValidationError);
+    const ca = await createTestOwner(deps);
+    await expect(suggestProfileFromInvoice(caCtx(deps, ca.id, o.id), file())).rejects.toBeInstanceOf(ForbiddenError);
+  });
+
+  it("with the Claude extractor and KORRA_LLM_ENABLED=false it returns an empty suggestion and sends nothing", async () => {
+    vi.stubEnv("KORRA_LLM_ENABLED", "false");
+    const create = vi.fn();
+    const ingester = createIngester({ llm: createClaudeExtractor({ apiKey: "k", client: { messages: { create } } as never }) });
+    const o = await createTestOwner({ ...deps, ingester });
+    expect(await suggestProfileFromInvoice(o.ctx, file())).toEqual(EMPTY);
+    expect(create).not.toHaveBeenCalled();
+    vi.unstubAllEnvs();
   });
 });
 

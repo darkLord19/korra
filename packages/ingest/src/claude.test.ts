@@ -37,7 +37,7 @@ afterEach(() => vi.unstubAllEnvs());
 
 describe("createClaudeExtractor (client double)", () => {
   it("sends the PDF as a document block with a json_schema output and the default model", async () => {
-    const { create, client } = clientReturning({ kind: "unknown", invoices: [], payments: [], nocRef: null, warnings: [] });
+    const { create, client } = clientReturning({ kind: "unknown", invoices: [], payments: [], issuer: null, nocRef: null, warnings: [] });
     await createClaudeExtractor({ apiKey: "k", client }).extract(pdfDoc());
     const req = (create.mock.calls[0] as unknown as [Req])[0];
     expect(req.model).toBe("claude-sonnet-5-5");
@@ -51,7 +51,7 @@ describe("createClaudeExtractor (client double)", () => {
   });
 
   it("sends images as image blocks", async () => {
-    const { create, client } = clientReturning({ kind: "unknown", invoices: [], payments: [], nocRef: null, warnings: [] });
+    const { create, client } = clientReturning({ kind: "unknown", invoices: [], payments: [], issuer: null, nocRef: null, warnings: [] });
     const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0, 0, 0, 0]);
     await createClaudeExtractor({ apiKey: "k", client }).extract({ bytes: png, mimeType: "image/png", filename: "a.png" });
     const req = (create.mock.calls[0] as unknown as [Req])[0];
@@ -66,7 +66,7 @@ describe("createClaudeExtractor (client double)", () => {
         invoiceNo: t("INV-7", 1), invoiceDate: t("2026-09-30", 1), clientName: t("Acme Corp"),
         clientCountry: t("us", 0.9), amount: m("1234.56", "USD", 0.98), sacCode: t("998314"),
       }],
-      payments: [], nocRef: null, warnings: [],
+      payments: [], issuer: null, nocRef: null, warnings: [],
     });
     const res = await createClaudeExtractor({ apiKey: "k", client }).extract(pdfDoc());
     const inv = res.invoices[0]!;
@@ -75,6 +75,60 @@ describe("createClaudeExtractor (client double)", () => {
     expect(inv.netRealisableValue).toEqual({ value: money(123456n, "USD"), confidence: 0.7, source: "default" });
     expect(inv.clientCountry.value).toBe("US");
     expect(inv.contractRef).toMatchObject({ value: null, confidence: 0 });
+  });
+
+  it("asks for the issuer in the prompt and the schema", async () => {
+    const { create, client } = clientReturning({ kind: "unknown", invoices: [], payments: [], issuer: null, nocRef: null, warnings: [] });
+    await createClaudeExtractor({ apiKey: "k", client }).extract(pdfDoc());
+    const req = (create.mock.calls[0] as unknown as [Req & { output_config: { format: { schema: { required: string[]; properties: { issuer: unknown } } } } }])[0];
+    expect(req.system).toMatch(/Issuer \(kind "invoice" only/);
+    expect(req.output_config.format.schema.required).toContain("issuer");
+    expect(JSON.stringify(req.output_config.format.schema.properties.issuer)).toMatch(/ifsc/);
+  });
+
+  it("converts the issuer: ids are checked against their formats, the PAN comes from the GSTIN, the SAC from the invoice", async () => {
+    const { client } = clientReturning({
+      kind: "invoice",
+      invoices: [{ ...emptyInvoice, invoiceNo: t("INV-7", 1), sacCode: t("998314", 0.9) }],
+      payments: [],
+      issuer: { legalName: t("Jane Dev Consulting", 0.95), address: t("12 MG Road, Bengaluru 560001, India", 0.9), gstin: t(" 29abcde1234f1z5 ", 0.95), ifsc: t("hdfc 0001234", 0.9), bankName: t("HDFC Bank Ltd", 0.9) },
+      nocRef: null, warnings: [],
+    });
+    const res = await createClaudeExtractor({ apiKey: "k", client }).extract(pdfDoc());
+    expect(res.issuer).toEqual({
+      legalName: { value: "Jane Dev Consulting", confidence: 0.95, source: "extracted" },
+      address: { value: "12 MG Road, Bengaluru 560001, India", confidence: 0.9, source: "extracted" },
+      gstin: { value: "29ABCDE1234F1Z5", confidence: 0.95, source: "extracted" },
+      pan: { value: "ABCDE1234F", confidence: 0.95, source: "extracted" },
+      sacCode: { value: "998314", confidence: 0.9, source: "extracted" },
+      ifsc: { value: "HDFC0001234", confidence: 0.9, source: "extracted" },
+      bankName: { value: "HDFC Bank Ltd", confidence: 0.9, source: "extracted" },
+    });
+  });
+
+  it("drops a malformed GSTIN or IFSC (and the PAN with it), and gives no issuer for other kinds", async () => {
+    const bad = clientReturning({
+      kind: "invoice", invoices: [{ ...emptyInvoice }], payments: [],
+      issuer: { legalName: t(null, 0), address: t(null, 0), gstin: t("GB123456789", 0.9), ifsc: t("HDFC1234567", 0.9), bankName: t(null, 0) },
+      nocRef: null, warnings: [],
+    }).client;
+    const res = await createClaudeExtractor({ apiKey: "k", client: bad }).extract(pdfDoc());
+    expect(res.issuer).toMatchObject({ gstin: { value: null }, pan: { value: null }, ifsc: { value: null }, sacCode: { value: null } });
+
+    const other = clientReturning({
+      kind: "fira", invoices: [], payments: [{ ...emptyPayment }],
+      issuer: { legalName: t("X"), address: t(null, 0), gstin: t(null, 0), ifsc: t(null, 0), bankName: t(null, 0) },
+      nocRef: null, warnings: [],
+    }).client;
+    expect((await createClaudeExtractor({ apiKey: "k", client: other }).extract(pdfDoc())).issuer).toBeUndefined();
+  });
+
+  it("with KORRA_LLM_ENABLED=false the issuer is absent too (nothing is sent)", async () => {
+    vi.stubEnv("KORRA_LLM_ENABLED", "false");
+    const { create, client } = clientReturning({});
+    const res = await createClaudeExtractor({ apiKey: "k", client }).extract(pdfDoc());
+    expect(create).not.toHaveBeenCalled();
+    expect(res.issuer).toBeUndefined();
   });
 
   it("returns a FIRA as a payment with firaRef, purposeCode and swift mode", async () => {
@@ -86,7 +140,7 @@ describe("createClaudeExtractor (client double)", () => {
         inrCredited: m("166400.00", "INR"), fxRate: t("83.2"), firaRef: t("FIRA123"), purposeCode: t("P0802"),
         payerName: t("Deel Inc"),
       }],
-      nocRef: null, warnings: [],
+      issuer: null, nocRef: null, warnings: [],
     });
     const res = await createClaudeExtractor({ apiKey: "k", client }).extract(pdfDoc());
     const p = res.payments[0]!;
@@ -102,6 +156,7 @@ describe("createClaudeExtractor (client double)", () => {
       kind: "noc",
       invoices: [{ ...emptyInvoice }],
       payments: [{ ...emptyPayment }],
+      issuer: null,
       nocRef: { reference: "NOC-9", amount: "2000.00", currency: "USD", date: "2026-09-20" },
       warnings: [],
     });

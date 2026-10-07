@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { yearMonthSchema } from "@korra/backend/schemas";
 import { Alert, MonthScreen, PackScreen, SettingsScreen, TrackerScreen, OnboardingScreen, currentMonthIST, errorMessage, useApi, useNav, type SettingsSlots } from "@korra/ui";
 import { setFlow, useFlow } from "@/lib/flow";
+import { fileHeldInvoice, holdInvoice } from "@/lib/pending-invoice";
 import { BackupPanel, DataPanel } from "./DataPanels";
 import { ExportPanels } from "./ExportPanels";
 import { KeepTrackingCard } from "./KeepTrackingCard";
@@ -14,7 +15,7 @@ const Loading = () => <p className="text-sm text-muted" role="status">Loading...
 export const OnboardingRoute = () => (
   <OnboardingScreen
     step="Step 1 of 3 · Your details"
-    onSaved={() => setFlow("started")}
+    onSaved={(invoice) => { holdInvoice(invoice); setFlow("started"); }}
   />
 );
 export const TrackerRoute = () => <TrackerScreen />;
@@ -40,7 +41,15 @@ export function MonthRoute() {
   useEffect(() => {
     let live = true;
     api.getOnboarding().then(
-      (ob) => { if (!live) return; if (ob.complete) setReady(true); else router.replace(nav.hrefs.onboarding()); },
+      async (ob) => {
+        if (!live) return;
+        if (!ob.complete) return router.replace(nav.hrefs.onboarding());
+        // An invoice that filled in the setup form is filed first, so the page's first load already lists it (under its own month).
+        const filedIn = await fileHeldInvoice(api);
+        if (!live) return;
+        if (filedIn) router.replace(nav.hrefs.month(filedIn));
+        setReady(true);
+      },
       (e: unknown) => { if (live) setError(errorMessage(e)); },
     );
     return () => { live = false; };

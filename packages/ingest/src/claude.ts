@@ -1,9 +1,9 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
-import type { Field, InvoiceFacts, Money, PaymentFacts, ReceiptMode } from "@korra/core";
+import { GSTIN_RE, IFSC_RE, panFromGstin, type Field, type InvoiceFacts, type Money, type PaymentFacts, type ReceiptMode } from "@korra/core";
 import { field, missing, parseAmount, parseCurrency, parseDate, parseRate } from "./normalize";
 import { LLM_MIME, sniff } from "./sniff";
-import { IngestError, type IngestDoc, type IngestResult, type LlmExtractor } from "./types";
+import { IngestError, type IngestDoc, type IngestResult, type IssuerFacts, type LlmExtractor } from "./types";
 
 /** Design doc §7.2 default. (Sonnet 5.5: no forced tool_choice, no sampling params, no thinking param.) */
 export const DEFAULT_MODEL = "claude-sonnet-5-5";
@@ -51,10 +51,20 @@ const paymentSchema = z.object({
   realisingBankName: textField,
 });
 
+/** The exporter who issued the invoice, for filling in their profile. */
+const issuerSchema = z.object({
+  legalName: textField,
+  address: textField,
+  gstin: textField,
+  ifsc: textField,
+  bankName: textField,
+});
+
 const outputSchema = z.object({
   kind: z.enum(["invoice", "fira", "noc", "statement", "unknown"]),
   invoices: z.array(invoiceSchema),
   payments: z.array(paymentSchema),
+  issuer: issuerSchema.nullable(),
   nocRef: z
     .object({
       reference: z.string().nullable(),
@@ -92,6 +102,10 @@ Invoice fields (kind "invoice"):
 - sacCode: the GST SAC (Service Accounting Code), a 6-digit number starting with 99 (for example "998314"), if printed.
 - amount: the invoice total in the invoice currency.
 - netRealisableValue: the amount the exporter will actually realise, i.e. the invoice amount minus any deductions shown (withholding tax, platform fees, discounts). If the document shows no deductions, it equals amount.
+
+Issuer (kind "invoice" only; for other kinds set "issuer" to null): the exporter who issued the invoice, the Indian service provider (the seller, never the client or a platform).
+- legalName: their name or business name as printed. address: their full address as one line.
+- gstin: their 15-character Indian GST number, if printed (never a foreign tax id or the client's). ifsc: the IFSC of their bank (4 letters, a zero, 6 characters) if bank details are printed. bankName: the name of their bank, if printed.
 
 Payment fields (kind "fira", "statement"): one entry in "payments" per remittance.
 - receiptMode: "swift" when foreign currency was remitted to a bank account (every FIRA is swift); "local_transfer" when a platform's Indian partner bank paid INR domestically; null if not clear.
@@ -149,6 +163,22 @@ function toInvoice(i: Output["invoices"][number]): Omit<InvoiceFacts, "id" | "ad
   };
 }
 
+function toIssuer(i: NonNullable<Output["issuer"]>, sacCode: Field<string>): IssuerFacts {
+  const g = i.gstin.value?.trim().toUpperCase() ?? "";
+  const pan = panFromGstin(g);
+  const ifsc = i.ifsc.value?.replace(/\s+/g, "").toUpperCase() ?? "";
+  // The model's ids are checked against their formats, and the PAN is read off the GSTIN rather than trusted.
+  return {
+    legalName: toText(i.legalName),
+    address: toText(i.address),
+    gstin: GSTIN_RE.test(g) ? field(g, clamp01(i.gstin.confidence)) : missing(),
+    pan: pan ? field(pan, clamp01(i.gstin.confidence)) : missing(),
+    sacCode,
+    ifsc: IFSC_RE.test(ifsc) ? field(ifsc, clamp01(i.ifsc.confidence)) : missing(),
+    bankName: toText(i.bankName),
+  };
+}
+
 function toPayment(p: Output["payments"][number], kind: Output["kind"]): Omit<PaymentFacts, "id"> {
   const modeText = p.receiptMode.value?.trim().toLowerCase().replace(/[\s-]+/g, "_");
   const mode: ReceiptMode | null = modeText === "swift" ? "swift" : modeText === "local_transfer" ? "local_transfer" : null;
@@ -191,11 +221,13 @@ function convert(out: Output): IngestResult {
       warnings,
     };
   }
+  const first = out.invoices[0];
   return {
     kind: out.kind,
     rail: null,
     invoices: out.kind === "unknown" ? [] : out.invoices.map(toInvoice),
     payments: out.kind === "unknown" ? [] : out.payments.map((p) => toPayment(p, out.kind)),
+    ...(out.kind === "invoice" && out.issuer && { issuer: toIssuer(out.issuer, first ? toText(first.sacCode) : missing()) }),
     warnings,
   };
 }
