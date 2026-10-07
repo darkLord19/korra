@@ -11,8 +11,8 @@ const KIND: Record<string, string> = { invoice: "Invoice", statement: "Statement
 /** A document Korra could not turn into records: the user can type them in. */
 const needsHandEntry = (d: DocumentWire) => d.status === "failed" || (d.status === "ingested" && d.kind === "unknown");
 
-export function DocumentsSection({ month, documents, banks, readOnly = false, onChanged, onPoll }: {
-  month: string; documents: DocumentWire[]; banks: AdBankWire[]; readOnly?: boolean;
+export function DocumentsSection({ month, documents, banks, lastSacCode, readOnly = false, onChanged, onPoll }: {
+  month: string; documents: DocumentWire[]; banks: AdBankWire[]; lastSacCode?: string | null | undefined; readOnly?: boolean;
   /** Called after the user adds records by hand. */
   onChanged?: (() => void) | undefined;
   /** Called every few seconds while documents are still being read. Defaults to the app's `nav.refresh`. */
@@ -49,7 +49,7 @@ export function DocumentsSection({ month, documents, banks, readOnly = false, on
                 </div>
                 {!readOnly && entering === d.id && (
                   <div className="mt-3">
-                    <ManualEntryPanel month={month} documentId={d.id} banks={banks} onCancel={() => setEntering(null)} onDone={() => { setEntering(null); onChanged?.(); }} />
+                    <ManualEntryPanel month={month} documentId={d.id} banks={banks} lastSacCode={lastSacCode} onCancel={() => setEntering(null)} onDone={() => { setEntering(null); onChanged?.(); }} />
                   </div>
                 )}
               </li>

@@ -14,6 +14,8 @@ import type { DocumentWire, RequestUploadResult, SweepResult } from "./wire-type
 
 export const STUCK_AFTER_MS = 10 * 60 * 1000;
 export const MAX_INGEST_ATTEMPTS = 3;
+/** Confidence of a SAC code filled in from the last-used one: under FLAG_THRESHOLD (0.9), so readiness still asks for review. */
+export const DEFAULT_SAC_CONFIDENCE = 0.7;
 
 export async function requestUpload(ctx: Ctx, raw: RequestUploadInput): Promise<RequestUploadResult> {
   requireOwner(ctx);
@@ -104,10 +106,13 @@ async function applyResult(deps: Deps, doc: DocumentRecord, result: IngestResult
   if (result.invoices.length > 0) {
     const profile = await r.profile.get();
     const bank = profile?.defaultAdBankId ?? null;
+    const lastSac = await r.invoices.lastSacCode();
     await r.invoices.insertExtracted(
       doc.id,
       result.invoices.map((inv) => ({
         ...inv,
+        // No SAC on the invoice: assume the one used last, below the flag threshold (like the NRV default) so it still gets a look.
+        sacCode: inv.sacCode.value === null && lastSac ? { value: lastSac, confidence: DEFAULT_SAC_CONFIDENCE, source: "default" as const } : inv.sacCode,
         adBankId: { value: bank, confidence: bank ? 1 : 0, source: "default" as const },
       })),
     );

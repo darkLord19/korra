@@ -3,7 +3,7 @@ import { IngestError } from "@korra/ingest";
 import { createRepos } from "@korra/db";
 import {
   ForbiddenError, NotFoundError, ValidationError,
-  acceptCaInvite, confirmUpload, decideAllocation, deleteAccount, editField, generatePack, getMonthState,
+  acceptCaInvite, confirmUpload, createInvoiceManually, decideAllocation, deleteAccount, editField, generatePack, getMonthState,
   getCaInvite, getOnboarding, getPackDownloads, getTracker, inviteCa, isPlaceholderLayout, layoutIdFor, linkNoc, listCaClients, listMyCas,
   markPackSubmitted, requestUpload, revokeCa, runDailyNotifications, requeueStuckIngests, runIngest, saveBank, saveProfile, sweepStuckIngests, toWire,
 } from "./index";
@@ -109,6 +109,42 @@ describe("runIngest", () => {
     expect(st.blockersByBank).toHaveLength(1);
     expect(st.blockersByBank[0]!.blockers).toContainEqual({ kind: "missing_field", entity: "invoice", id: st.invoices[0]!.id, field: "invoiceDate" });
     expect((await getMonthState(o.ctx, "2026-10")).invoices).toEqual([]);
+  });
+
+  it("an invoice with no SAC takes the last used one, as a default below the flag threshold", async () => {
+    const o = await createTestOwner(deps);
+    await onboard(o.ctx);
+    deps.fixtures["a.pdf"] = invoiceResult({ invoiceNo: f("A-1"), sacCode: f("998313", 0.95) });
+    deps.fixtures["b.pdf"] = invoiceResult({ invoiceNo: f("B-1"), sacCode: f<string>(null, 0) });
+    await upload(deps, o.ctx, { filename: "a.pdf", mimeType: "application/pdf", bytes: PDF, month: "2026-09" });
+    expect((await getMonthState(o.ctx, "2026-09")).lastSacCode).toBe("998313");
+    await upload(deps, o.ctx, { filename: "b.pdf", mimeType: "application/pdf", bytes: PDF, month: "2026-09" });
+    const st = await getMonthState(o.ctx, "2026-09");
+    const b = st.invoices.find((i) => i.invoiceNo.value === "B-1")!;
+    expect(b.sacCode).toEqual({ value: "998313", confidence: 0.7, source: "default" });
+    expect(st.invoices.find((i) => i.invoiceNo.value === "A-1")!.sacCode.value).toBe("998313");
+    expect(st.blockersByBank[0]!.blockers).toContainEqual({ kind: "flagged_field", entity: "invoice", id: b.id, field: "sacCode", confidence: 0.7 });
+  });
+
+  it("leaves the SAC empty when there is no earlier invoice with one, and never lets a default breed another default", async () => {
+    const o = await createTestOwner(deps);
+    await onboard(o.ctx);
+    deps.fixtures["none.pdf"] = invoiceResult({ invoiceNo: f("N-1"), sacCode: f<string>(null, 0) });
+    await upload(deps, o.ctx, { filename: "none.pdf", mimeType: "application/pdf", bytes: PDF, month: "2026-09" });
+    let st = await getMonthState(o.ctx, "2026-09");
+    expect(st.lastSacCode).toBeNull();
+    expect(st.invoices[0]!.sacCode.value).toBeNull();
+    expect(st.blockersByBank[0]!.blockers).toContainEqual({ kind: "missing_field", entity: "invoice", id: st.invoices[0]!.id, field: "sacCode" });
+
+    // The user types one invoice with a SAC; the next one without takes it, and the default is not itself "last used" later.
+    await createInvoiceManually(o.ctx, { month: "2026-09", fields: { invoiceNo: "M-1", invoiceDate: "2026-09-03", sacCode: "998391" } });
+    deps.fixtures["c.pdf"] = invoiceResult({ invoiceNo: f("C-1"), sacCode: f<string>(null, 0) });
+    await upload(deps, o.ctx, { filename: "c.pdf", mimeType: "application/pdf", bytes: PDF, month: "2026-09" });
+    st = await getMonthState(o.ctx, "2026-09");
+    expect(st.lastSacCode).toBe("998391");
+    expect(st.invoices.find((i) => i.invoiceNo.value === "C-1")!.sacCode).toEqual({ value: "998391", confidence: 0.7, source: "default" });
+    await editField(o.ctx, { entity: "invoice", id: st.invoices.find((i) => i.invoiceNo.value === "M-1")!.id, field: "sacCode", value: "998311" });
+    expect((await getMonthState(o.ctx, "2026-09")).lastSacCode).toBe("998311");
   });
 
   it("is idempotent when re-run, and refuses once the user edited the rows", async () => {

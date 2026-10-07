@@ -45,8 +45,16 @@ function useEntryForm() {
   return { errors, setErrors, pending, start };
 }
 
-export function ManualInvoiceForm({ month, banks, documentId, onDone, onCancel }: {
-  month: string; banks: AdBankWire[]; documentId?: string | undefined; onDone: () => void; onCancel: () => void;
+// Common SAC codes for freelancers, as suggestions only: verify against CBIC SAC list.
+const COMMON_SAC: [string, string][] = [
+  ["998311", "Management consulting"], ["998313", "IT consulting and support"],
+  ["998314", "IT design and development"], ["998391", "Specialty design"],
+];
+
+export function ManualInvoiceForm({ month, banks, documentId, lastSacCode, onDone, onCancel }: {
+  month: string; banks: AdBankWire[]; documentId?: string | undefined;
+  /** The SAC code of the user's most recent invoice: the SAC input starts with it. */
+  lastSacCode?: string | null | undefined; onDone: () => void; onCancel: () => void;
 }) {
   const api = useApi();
   const uid = useId();
@@ -94,7 +102,10 @@ export function ManualInvoiceForm({ month, banks, documentId, onDone, onCancel }
         <MoneyField id={id("amount")} name="amount" label={FIELD_LABELS.amount!} defaultCurrency="USD" error={fe.amount} required />
         <MoneyField id={id("netRealisableValue")} name="netRealisableValue" label={FIELD_LABELS.netRealisableValue!} defaultCurrency="USD" error={fe.netRealisableValue} hint="Leave empty if it equals the invoice amount." />
         <Field id={id("serviceDescription")} label={FIELD_LABELS.serviceDescription!} error={fe.serviceDescription}><Input id={id("serviceDescription")} name="serviceDescription" required aria-invalid={!!fe.serviceDescription} /></Field>
-        <Field id={id("sacCode")} label={FIELD_LABELS.sacCode!} hint="4 to 8 digits" error={fe.sacCode}><Input id={id("sacCode")} name="sacCode" inputMode="numeric" required aria-invalid={!!fe.sacCode} /></Field>
+        <Field id={id("sacCode")} label={FIELD_LABELS.sacCode!} hint="6 digits, e.g. 998314 for software development" error={fe.sacCode}>
+          <Input id={id("sacCode")} name="sacCode" inputMode="numeric" list={id("sacCodes")} defaultValue={lastSacCode ?? ""} required aria-invalid={!!fe.sacCode} />
+          <datalist id={id("sacCodes")}>{COMMON_SAC.map(([code, label]) => <option key={code} value={code}>{label}</option>)}</datalist>
+        </Field>
         <Field id={id("contractRef")} label={FIELD_LABELS.contractRef!} error={fe.contractRef}><Input id={id("contractRef")} name="contractRef" aria-invalid={!!fe.contractRef} /></Field>
         {banks.length > 1 && (
           <Field id={id("adBankId")} label={FIELD_LABELS.adBankId!} hint="Leave as default to use your default bank." error={fe.adBankId}>
@@ -174,8 +185,8 @@ export function ManualPaymentForm({ month, documentId, onDone, onCancel }: {
 }
 
 /** For a document Korra could not read: choose invoice or payment, then type it in. The document id is attached. */
-export function ManualEntryPanel({ month, documentId, banks, onDone, onCancel }: {
-  month: string; documentId: string; banks: AdBankWire[]; onDone: () => void; onCancel: () => void;
+export function ManualEntryPanel({ month, documentId, banks, lastSacCode, onDone, onCancel }: {
+  month: string; documentId: string; banks: AdBankWire[]; lastSacCode?: string | null | undefined; onDone: () => void; onCancel: () => void;
 }) {
   const [kind, setKind] = useState<"invoice" | "payment">("invoice");
   return (
@@ -189,7 +200,7 @@ export function ManualEntryPanel({ month, documentId, banks, onDone, onCancel }:
         ))}
       </div>
       {kind === "invoice"
-        ? <ManualInvoiceForm month={month} banks={banks} documentId={documentId} onDone={onDone} onCancel={onCancel} />
+        ? <ManualInvoiceForm month={month} banks={banks} documentId={documentId} lastSacCode={lastSacCode} onDone={onDone} onCancel={onCancel} />
         : <ManualPaymentForm month={month} documentId={documentId} onDone={onDone} onCancel={onCancel} />}
     </div>
   );

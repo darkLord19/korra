@@ -84,6 +84,23 @@ describe("month view", () => {
     });
   });
 
+  it("starts the by-hand SAC code with the last used one, still required, with common codes to pick from", async () => {
+    const { unmount } = render(<Wrap api={fakeApi()}><MonthView month="2026-09" state={monthState({ lastSacCode: "998313" })} banks={[bank]} packs={[]} /></Wrap>);
+    await userEvent.click(screen.getByRole("button", { name: "Add invoice by hand" }));
+    const form = screen.getByRole("form", { name: "Add invoice by hand" });
+    const sac = within(form).getByLabelText("SAC code") as HTMLInputElement;
+    expect(sac.value).toBe("998313");
+    expect(sac.required).toBe(true);
+    expect(within(form).getByText("6 digits, e.g. 998314 for software development")).toBeTruthy();
+    const options = Array.from(form.querySelectorAll(`datalist[id="${sac.getAttribute("list")}"] option`)).map((o) => (o as HTMLOptionElement).value);
+    expect(options).toEqual(["998311", "998313", "998314", "998391"]);
+    unmount();
+
+    render(<Wrap api={fakeApi()}><MonthView month="2026-09" state={monthState()} banks={[bank]} packs={[]} /></Wrap>);
+    await userEvent.click(screen.getByRole("button", { name: "Add invoice by hand" }));
+    expect((within(screen.getByRole("form", { name: "Add invoice by hand" })).getByLabelText("SAC code") as HTMLInputElement).value).toBe("");
+  });
+
   it("offers 'Enter details by hand' on a failed document and attaches its id", async () => {
     const createPaymentManually = vi.fn().mockResolvedValue({ id: "pay1" });
     const onChanged = vi.fn();
@@ -220,7 +237,6 @@ describe("profile form: choosing a bank", () => {
     await userEvent.type(screen.getByLabelText("Registered address"), "12 MG Road");
     await userEvent.type(screen.getByLabelText("PAN"), "ABCDE1234F");
     await userEvent.type(screen.getByLabelText("GSTIN"), "29ABCDE1234F1Z5");
-    await userEvent.type(screen.getByLabelText("Default SAC codes"), "998314");
   };
   const apis = () => {
     const saveBank = vi.fn().mockImplementation(async (i: { id?: string; name: string; adCode: string }) => ({ id: i.id ?? "new1", name: i.name, adCode: i.adCode }));

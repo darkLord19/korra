@@ -36,6 +36,7 @@ export function monthState(over: Partial<MonthStateWire> = {}): MonthStateWire {
     realisations: {},
     blockersByBank: [],
     pendingDocumentIds: [],
+    lastSacCode: null,
     ...over,
   };
 }

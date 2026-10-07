@@ -58,7 +58,6 @@ export async function completeOnboarding(page: Page): Promise<void> {
   await page.getByLabel("Registered address").fill("12 MG Road, Bengaluru");
   await page.getByLabel("PAN", { exact: true }).fill("ABCDE1234F");
   await page.getByLabel("GSTIN").fill("29ABCDE1234F1Z5");
-  await page.getByLabel("Default SAC codes").fill("998314");
   await page.getByLabel("Which bank receives your foreign payments?").selectOption({ label: "Kotak Mahindra Bank" });
   await page.getByLabel("AD code").fill("6390001");
   await page.getByRole("button", { name: "Save and continue" }).click();

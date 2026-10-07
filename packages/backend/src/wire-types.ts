@@ -81,6 +81,8 @@ export interface MonthStateWire {
   /** `placeholderLayout`: the bank has no official EDF format yet, so its pack uses a stand-in layout. */
   blockersByBank: { adBankId: string; adBankName: string; blockers: BlockerWire[]; placeholderLayout: boolean }[];
   pendingDocumentIds: string[];
+  /** SAC code of the owner's most recent invoice that has one: the by-hand invoice form starts with it. */
+  lastSacCode: string | null;
 }
 
 export type GeneratePackResult =

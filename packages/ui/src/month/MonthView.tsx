@@ -89,8 +89,8 @@ export function MonthView({
         </Card>
       )}
 
-      <DocumentsSection month={month} documents={state.documents} banks={banks} readOnly={readOnly} onChanged={onChanged} onPoll={onPoll} />
-      <InvoicesSection month={month} invoices={state.invoices} banks={banks} realisations={state.realisations} readOnly={readOnly} onChanged={onChanged} />
+      <DocumentsSection month={month} documents={state.documents} banks={banks} lastSacCode={state.lastSacCode} readOnly={readOnly} onChanged={onChanged} onPoll={onPoll} />
+      <InvoicesSection month={month} invoices={state.invoices} banks={banks} realisations={state.realisations} lastSacCode={state.lastSacCode} readOnly={readOnly} onChanged={onChanged} />
       {!isEdf && <PaymentsSection month={month} payments={state.payments} documents={state.documents} banks={banks} readOnly={readOnly} onChanged={onChanged} />}
       {!isEdf && <MatchesSection allocations={state.allocations} invoices={state.invoices} payments={state.payments} readOnly={readOnly} onChanged={onChanged} />}
       <PacksSection month={month} blockersByBank={state.blockersByBank} invoices={state.invoices} packs={packs} readOnly={readOnly} onChanged={onChanged} mode={mode} />

@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it, vi } from "vitest";
 import { NotFoundError, ValidationError } from "@korra/backend";
+import { createLocalDeps } from "@korra/backend/browser";
 import { createTestDeps, createTestOwner, type TestDeps } from "@korra/backend/testing";
 import { KorraApiError, UNSUPPORTED_FILE_MESSAGE } from "@korra/ui";
 import { createIngestRunner } from "./ingest-runner";
@@ -147,6 +148,24 @@ describe("local KorraApi", () => {
     expect(await api.generatePack({ month: "2026-09", adBankId: bank.id })).toMatchObject({ ok: true });
     expect(error).toHaveBeenCalled();
     error.mockRestore();
+  });
+
+  it("reads PDFs with the local rules, and an invoice without a SAC takes the last used one (same applyResult as the web app)", async () => {
+    // The browser's real ingester (rules over a text layer), with the text layer read from the bytes instead of pdf.js.
+    const base = await createTestDeps();
+    const blobs = trackBlobs(base.blobs, () => undefined);
+    const deps: TestDeps = { ...base, blobs: blobs as unknown as TestDeps["blobs"], ingester: createLocalDeps({ db: base.db, blobs, getTextLayer: async (b) => new TextDecoder().decode(b).split("\n").slice(1) }).ingester };
+    const { ctx } = await createTestOwner(deps);
+    const { api } = createLocalApi({ ctx, blobs, ingest: createIngestRunner(deps, ctx), resumeEveryMs: 0 });
+    const pdf = (name: string, no: string, sac: string) =>
+      new File([`%PDF-1.4\nInvoice No: ${no}\nInvoice Date: 2026-09-02\nBill To: Acme Corp\n1 Main St, New York, United States\nSoftware development ${sac}\nTotal: $1,500.00\n`], name, { type: "application/pdf" });
+    await api.uploadFile(pdf("a.pdf", "INV-A1", "SAC 998313"), { month: "2026-09" });
+    await vi.waitFor(async () => expect((await api.getMonthState("2026-09")).invoices).toHaveLength(1));
+    await api.uploadFile(pdf("b.pdf", "INV-B2", ""), { month: "2026-09" });
+    await vi.waitFor(async () => expect((await api.getMonthState("2026-09")).invoices).toHaveLength(2));
+    const month = await api.getMonthState("2026-09");
+    expect(month.invoices.find((i) => i.invoiceNo.value === "INV-A1")!.sacCode).toMatchObject({ value: "998313", source: "extracted" });
+    expect(month.invoices.find((i) => i.invoiceNo.value === "INV-B2")!.sacCode).toEqual({ value: "998313", confidence: 0.7, source: "default" });
   });
 
   it("a document a closed tab left ingesting is picked up by getMonthState once it is stuck, and only run once", async () => {

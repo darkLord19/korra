@@ -50,7 +50,7 @@ export function ProfileForm({ profile, banks, submitLabel = "Save and continue",
           pan: str(fd, "pan"),
           gstin: str(fd, "gstin"),
           iec: str(fd, "iec") || null,
-          defaultSacCodes: str(fd, "defaultSacCodes").split(/[\s,]+/).filter(Boolean),
+          defaultSacCodes: p?.defaultSacCodes ?? [], // no longer asked for (SAC is per invoice); kept as stored
           defaultAdBankId: bank.id,
         });
         setSaved(true);
@@ -73,9 +73,6 @@ export function ProfileForm({ profile, banks, submitLabel = "Save and continue",
         <Field id="pan" label="PAN" hint="Like ABCDE1234F" error={fe.pan}><Input id="pan" name="pan" defaultValue={p?.pan ?? ""} required aria-invalid={!!fe.pan} className="uppercase" maxLength={10} /></Field>
         <Field id="gstin" label="GSTIN" hint="15 characters" error={fe.gstin}><Input id="gstin" name="gstin" defaultValue={p?.gstin ?? ""} required aria-invalid={!!fe.gstin} className="uppercase" maxLength={15} /></Field>
         <Field id="iec" label="IEC (optional)" hint="10 characters, if you have one" error={fe.iec}><Input id="iec" name="iec" defaultValue={p?.iec ?? ""} aria-invalid={!!fe.iec} className="uppercase" maxLength={10} /></Field>
-        <Field id="defaultSacCodes" label="Default SAC codes" hint="Separate with commas, e.g. 998314, 998313" error={fe.defaultSacCodes}>
-          <Input id="defaultSacCodes" name="defaultSacCodes" defaultValue={p?.defaultSacCodes.join(", ") ?? ""} aria-invalid={!!fe.defaultSacCodes} />
-        </Field>
       </div>
       <div className="grid gap-4 sm:grid-cols-2 sm:items-start">
         <div className="space-y-4">

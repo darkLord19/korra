@@ -7,7 +7,7 @@ import type {
   PaymentFacts,
   YearMonth,
 } from "@korra/core";
-import { and, asc, eq, inArray, isNull, lt, ne, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, lt, ne, or, sql } from "drizzle-orm";
 import { blobKeyFor } from "./blob-core";
 import type { Db } from "./db-type";
 import { ForbiddenError, NotFoundError, ValidationError } from "./errors";
@@ -346,6 +346,13 @@ export function createRepos(db: Db, actor: Actor, opts: RepoOptions = {}) {
         .where(and(eq(s.invoice.userId, uid), or(eq(s.invoice.month, month), and(isNull(s.invoice.month), eq(s.document.month, month)))))
         .orderBy(asc(s.invoice.createdAt), asc(s.invoice.id));
       return rows.map(({ inv }) => ({ facts: invoiceFromRow(inv), documentId: inv.documentId, undated: inv.month === null }));
+    },
+    /** SAC code of the user's most recently added invoice that has one (not counting codes Korra itself filled in as a default). */
+    async lastSacCode(): Promise<string | null> {
+      const uid = await readOwner();
+      const rows = await db.select({ sac: s.invoice.sacCode }).from(s.invoice).where(eq(s.invoice.userId, uid)).orderBy(desc(s.invoice.createdAt), desc(s.invoice.id));
+      for (const { sac } of rows) if (typeof sac.value === "string" && sac.value.trim() && sac.source !== "default") return sac.value;
+      return null;
     },
     /** `documentId` may be null (manually created). Month and ad_bank_id are derived from the field values. */
     async insertExtracted(documentId: string | null, facts: Omit<InvoiceFacts, "id">[]): Promise<string[]> {

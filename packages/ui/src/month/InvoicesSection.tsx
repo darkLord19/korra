@@ -19,8 +19,8 @@ const REQUIRED: readonly string[] = REQUIRED_FIELDS.invoice;
 
 export const invoiceAnchor = (id: string, field: string) => `inv-${id}-${field}`;
 
-export function InvoicesSection({ month, invoices, banks, realisations, readOnly = false, onChanged }: {
-  month: string; invoices: InvoiceWire[]; banks: AdBankWire[]; realisations: Record<string, RealisationWire>; readOnly?: boolean;
+export function InvoicesSection({ month, invoices, banks, realisations, lastSacCode, readOnly = false, onChanged }: {
+  month: string; invoices: InvoiceWire[]; banks: AdBankWire[]; realisations: Record<string, RealisationWire>; lastSacCode?: string | null | undefined; readOnly?: boolean;
   onChanged?: (() => void) | undefined;
 }) {
   const [adding, setAdding] = useState(false);
@@ -34,7 +34,7 @@ export function InvoicesSection({ month, invoices, banks, realisations, readOnly
       />
       <CardBody className="space-y-6">
         {!readOnly && adding && (
-          <ManualInvoiceForm month={month} banks={banks} onCancel={() => setAdding(false)} onDone={() => { setAdding(false); onChanged?.(); }} />
+          <ManualInvoiceForm month={month} banks={banks} lastSacCode={lastSacCode} onCancel={() => setAdding(false)} onDone={() => { setAdding(false); onChanged?.(); }} />
         )}
         {invoices.length === 0 && <p className="text-sm text-muted">{readOnly ? "No invoices for this month." : "No invoices for this month yet. Upload an invoice above."}</p>}
         {invoices.map((inv) => {
