@@ -45,7 +45,7 @@ export function InvoiceFill({ apply }: { apply: (s: ProfileSuggestionWire, file:
         onDragOver={(e) => { e.preventDefault(); setOver(true); }}
         onDragLeave={() => setOver(false)}
         onDrop={onDrop}
-        className={cx("flex flex-wrap items-center justify-between gap-3 rounded-lg border-2 border-dashed px-4 py-3", over ? "border-accent bg-accent-soft" : "border-line")}
+        className={cx("flex flex-wrap items-center justify-between gap-3 rounded-lg border-2 border-dashed px-4 py-3 sm:flex-nowrap", over ? "border-accent bg-accent-soft" : "border-line")}
       >
         <div className="min-w-0 text-sm">
           <p className="font-medium">Have an invoice handy? Drop it here to fill this in</p>

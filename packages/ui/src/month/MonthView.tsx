@@ -1,9 +1,11 @@
 "use client";
 import type { ReactNode } from "react";
+import { edfDueDate } from "@korra/core";
 import type { AdBankWire, MonthStateWire, PackWire } from "@korra/backend/schemas";
 import { buttonClass, Card, CardBody, CardHeader, Select } from "../components";
 import { useNav } from "../context";
-import { currentMonthIST, monthLabel, shiftMonth } from "../lib/format";
+import { currentMonthIST, dateLabel, monthLabel, shiftMonth } from "../lib/format";
+import { flaggedCount } from "../lib/fields";
 import { DocumentsSection } from "./DocumentsSection";
 import { InvoicesSection } from "./InvoicesSection";
 import { MatchesSection } from "./MatchesSection";
@@ -26,9 +28,33 @@ export interface MonthViewProps {
   uploadDescription?: ReactNode;
   /** Streamlined first-run EDF flow hides payments, matches, prev/next and the upload hint. */
   mode?: "full" | "edf";
+  /** Progress shown above the header (the first-run flow passes a stepper). */
+  step?: ReactNode;
 }
 
 const DEFAULT_UPLOAD_DESCRIPTION = "Add this month's invoices, your Deel transactions export, FIRAs and NOCs. Files go straight to secure storage.";
+/** One line on where the month stands (EDF flow): counts of invoices, unread documents, flags and missing fields, then the due date. */
+function EdfStatus({ month, state }: { month: string; state: MonthStateWire }) {
+  const n = state.invoices.length;
+  const reading = state.documents.filter((d) => d.status === "uploaded" || d.status === "ingesting").length;
+  const toConfirm = state.invoices.reduce((sum, inv) => sum + flaggedCount(inv), 0);
+  const missing = state.blockersByBank.reduce((sum, b) => sum + b.blockers.filter((bl) => bl.kind === "missing_field").length, 0);
+  const ready = n > 0 && state.blockersByBank.length > 0 && state.blockersByBank.every((b) => b.blockers.length === 0);
+  const parts = [
+    ready ? <span key="ready" className="font-medium text-ok">Ready to generate your pack</span> : n === 0 ? "No invoices yet" : n === 1 ? "1 invoice" : `${n} invoices`,
+    ...(!ready && reading > 0 ? [`${reading} being read`] : []),
+    ...(!ready && toConfirm > 0 ? [`${toConfirm} to confirm`] : []),
+    ...(!ready && missing > 0 ? [`${missing} missing`] : []),
+    `EDF due ${dateLabel(edfDueDate(month))}`,
+  ];
+  return (
+    <div className="space-y-1">
+      <p className="text-sm text-muted">{parts.map((p, i) => <span key={i}>{i > 0 && " · "}{p}</span>)}</p>
+      {n === 0 && <p className="text-sm">Upload this month&rsquo;s invoices below. Korra reads them in this browser and marks anything it is unsure about.</p>}
+    </div>
+  );
+}
+
 const EDF_UPLOAD_DESCRIPTION = "Add this month's invoices (PDF, or a Deel export CSV).";
 
 /** One month's workspace. With `readOnly` the upload panel, editing, match buttons and generate buttons are gone. */
@@ -42,6 +68,7 @@ export function MonthView({
   onPoll,
   uploadDescription,
   mode = "full",
+  step,
 }: MonthViewProps) {
   const nav = useNav();
   const { Link } = nav;
@@ -53,13 +80,17 @@ export function MonthView({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-3xl font-semibold">
-          {isEdf ? `Step 2 of 3 · Your ${monthLabel(month)} invoices` : monthLabel(month)}
-        </h1>
+      {step}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0 space-y-2">
+          <h1 className="text-2xl font-semibold sm:text-3xl">
+            {isEdf ? `Your ${monthLabel(month)} invoices` : monthLabel(month)}
+          </h1>
+          {isEdf && !readOnly && <EdfStatus month={month} state={state} />}
+        </div>
         {isEdf ? (
-          <div className="flex items-center gap-2">
-            <label htmlFor="change-month" className="text-xs font-medium text-muted">Change month</label>
+          <div className="flex items-center gap-2 sm:pt-2">
+            <label htmlFor="change-month" className="whitespace-nowrap text-xs font-medium text-muted">Change month</label>
             <Select
               id="change-month"
               aria-label="Change month"

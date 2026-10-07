@@ -6,3 +6,5 @@ export { cx } from "./cx";
 export { Field } from "./Field";
 export { Input, Select, Textarea } from "./Input";
 export { Table, Td, Th } from "./Table";
+export { Stepper } from "./Stepper";
+export { FileName } from "./FileName";

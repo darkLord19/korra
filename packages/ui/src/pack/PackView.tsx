@@ -1,9 +1,9 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import { edfDueDate } from "@korra/core";
 import { isGuideFile } from "@korra/backend/schemas";
 import type { PackDownloads } from "../api";
-import { Alert, Badge, Card, CardBody, CardHeader, buttonClass } from "../components";
-import { DISCLAIMER } from "../components/Footer";
+import { Alert, Badge, Card, CardBody, CardHeader, FileName, buttonClass, cx } from "../components";
 import { Markdown } from "../components/Markdown";
 import { useNav } from "../context";
 import { dateLabel, monthLabel } from "../lib/format";
@@ -15,6 +15,8 @@ export interface PackViewProps {
   readOnly?: boolean;
   /** Called after the pack was marked submitted: re-fetch it. */
   onChanged?: () => void;
+  /** Progress shown above the page (the first-run flow passes a stepper). */
+  step?: ReactNode;
 }
 
 /** The guide's text: from the adapter when it has it, else read from the guide file's URL. */
@@ -32,17 +34,33 @@ function useGuideText(downloads: PackDownloads): string | null {
   return given !== undefined ? given : fetched;
 }
 
-export function PackView({ downloads, readOnly = false, onChanged }: PackViewProps) {
+export function PackView({ downloads, readOnly = false, onChanged, step }: PackViewProps) {
   const { pack, placeholder, files } = downloads;
   const nav = useNav();
   const { Link } = nav;
   const guideText = useGuideText(downloads);
+  const next = readOnly || pack.status === "submitted" ? null : [
+    "Download the files below.",
+    `Submit them to your bank by ${dateLabel(edfDueDate(pack.month))}.`,
+    "Come back and mark the pack as submitted.",
+  ];
   return (
     <div className="space-y-6">
+      {step}
       <div>
         <Link href={nav.hrefs.month(pack.month)} className="text-sm text-accent underline">Back to {monthLabel(pack.month)}</Link>
-        <h1 className="mt-2 text-3xl font-semibold">EDF pack for {monthLabel(pack.month)}</h1>
+        <h1 className="mt-2 text-2xl font-semibold sm:text-3xl">EDF pack for {monthLabel(pack.month)}</h1>
         <p className="mt-1 text-sm text-muted">Generated {dateLabel(pack.generatedAt.slice(0, 10))}. {pack.status === "submitted" && pack.submittedAt ? <Badge tone="ok">Submitted {dateLabel(pack.submittedAt.slice(0, 10))}</Badge> : <Badge>Not submitted yet</Badge>}</p>
+        {next && (
+          <ol aria-label="What's next" className="mt-3 flex flex-col gap-1.5 text-sm sm:flex-row sm:gap-x-6">
+            {next.map((t, i) => (
+              <li key={t} className="flex items-start gap-2">
+                <span aria-hidden="true" className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full border border-line text-xs font-medium text-muted">{i + 1}</span>
+                <span>{t}</span>
+              </li>
+            ))}
+          </ol>
+        )}
       </div>
 
       {placeholder && (
@@ -56,9 +74,9 @@ export function PackView({ downloads, readOnly = false, onChanged }: PackViewPro
         <CardBody className="px-0 py-0">
           <ul className="divide-y divide-line">
             {files.map((f) => (
-              <li key={f.name} className="flex flex-wrap items-center justify-between gap-2 px-5 py-3 text-sm">
-                <span className="min-w-0 truncate">{f.name}</span>
-                <a href={f.url} download={f.name} className={buttonClass("secondary", "sm")}>Download</a>
+              <li key={f.name} className="flex items-center justify-between gap-3 px-5 py-3 text-sm">
+                <FileName name={f.name} />
+                <a href={f.url} download={f.name} className={cx(buttonClass("secondary", "sm"), "shrink-0")}>Download</a>
               </li>
             ))}
           </ul>
@@ -78,7 +96,6 @@ export function PackView({ downloads, readOnly = false, onChanged }: PackViewPro
           </CardBody>
         </Card>
       )}
-      <p className="text-xs text-muted">{DISCLAIMER}</p>
     </div>
   );
 }

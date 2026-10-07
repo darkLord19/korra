@@ -4,18 +4,21 @@ import { REQUIRED_FIELDS } from "@korra/core";
 import type { AdBankWire, InvoiceWire, RealisationWire } from "@korra/backend/schemas";
 import { Badge, Button, Card, CardBody, CardHeader } from "../components";
 import { FIELD_LABELS, dateLabel } from "../lib/format";
-import { needsCheck, type FieldKind } from "../lib/fields";
+import { INVOICE_FIELDS as FIELDS, flaggedCount } from "../lib/fields";
 import { ConfirmAllButton } from "./ConfirmAllButton";
 import { EditableCell } from "./EditableCell";
 import { ManualInvoiceForm } from "./ManualEntry";
 
-const FIELDS: { name: keyof InvoiceWire & string; kind: FieldKind }[] = [
-  { name: "invoiceNo", kind: "text" }, { name: "invoiceDate", kind: "date" }, { name: "clientName", kind: "text" },
-  { name: "clientAddress", kind: "text" }, { name: "clientCountry", kind: "country" }, { name: "amount", kind: "money" },
-  { name: "netRealisableValue", kind: "money" }, { name: "serviceDescription", kind: "text" }, { name: "sacCode", kind: "text" },
-  { name: "contractRef", kind: "text" }, { name: "adBankId", kind: "bankId" },
-];
 const REQUIRED: readonly string[] = REQUIRED_FIELDS.invoice;
+
+const realisationLabel = (r: RealisationWire) => {
+  switch (r.status) {
+    case "open": return `Payment due by ${dateLabel(r.deadline)}`;
+    case "partially_realised": return `Part paid · due by ${dateLabel(r.deadline)}`;
+    case "overdue": return `Overdue since ${dateLabel(r.deadline)}`;
+    case "realised": return "Realised";
+  }
+};
 
 export const invoiceAnchor = (id: string, field: string) => `inv-${id}-${field}`;
 
@@ -38,16 +41,16 @@ export function InvoicesSection({ month, invoices, banks, realisations, lastSacC
         )}
         {invoices.length === 0 && <p className="text-sm text-muted">{readOnly ? "No invoices for this month." : "No invoices for this month yet. Upload an invoice above."}</p>}
         {invoices.map((inv) => {
-          const flagged = FIELDS.filter((f) => needsCheck(inv[f.name] as never)).length;
+          const flagged = flaggedCount(inv);
           const r = realisations[inv.id];
           return (
             <article key={inv.id} aria-label={`Invoice ${inv.invoiceNo.value ?? "without number"}`} className="rounded-md border border-line">
-              <header className="flex flex-wrap items-center justify-between gap-2 border-b border-line bg-bg px-4 py-2">
+              <header className="flex flex-col gap-2 border-b border-line bg-bg px-4 py-2 sm:flex-row sm:items-center sm:justify-between">
                 <h3 className="font-medium">Invoice {inv.invoiceNo.value ?? "(no number)"}</h3>
                 <div className="flex flex-wrap items-center gap-2">
                   {flagged > 0 && <Badge tone="flag">{flagged} to check</Badge>}
                   {flagged > 0 && !readOnly && <ConfirmAllButton entity="invoice" id={inv.id} label={`invoice ${inv.invoiceNo.value ?? "without number"}`} onChanged={onChanged} />}
-                  {r && <Badge tone={r.status === "realised" ? "ok" : r.status === "overdue" ? "danger" : "neutral"}>{r.status.replace("_", " ")}; due {dateLabel(r.deadline)}</Badge>}
+                  {r && <Badge tone={r.status === "realised" ? "ok" : r.status === "overdue" ? "danger" : "neutral"}>{realisationLabel(r)}</Badge>}
                 </div>
               </header>
               <dl className="divide-y divide-line text-sm">

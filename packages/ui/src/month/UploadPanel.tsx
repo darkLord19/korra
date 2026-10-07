@@ -2,7 +2,7 @@
 import { useCallback, useRef, useState, type ChangeEvent, type DragEvent } from "react";
 import { MAX_UPLOAD_BYTES } from "@korra/backend/schemas";
 import type { UploadHint } from "../api";
-import { Badge, Select, cx } from "../components";
+import { Badge, FileName, Select, cx } from "../components";
 import { useApi } from "../context";
 import { isKorraApiError } from "../errors";
 import { mimeOf } from "../lib/files";
@@ -84,10 +84,12 @@ export function UploadPanel({ month, defaultHint = "", compact = false, onUpload
       {items.length > 0 && (
         <ul className="divide-y divide-line rounded-md border border-line text-sm" aria-live="polite">
           {items.map((it) => (
-            <li key={it.key} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2">
-              <span className="min-w-0 truncate">{it.name}</span>
-              <span className="flex items-center gap-2">
-                {it.message && <span className="text-xs text-danger">{it.message}</span>}
+            <li key={it.key} className="flex items-start justify-between gap-3 px-3 py-2">
+              <div className="min-w-0 flex-1">
+                <FileName name={it.name} />
+                {it.message && <p className="mt-0.5 text-xs text-danger">{it.message}</p>}
+              </div>
+              <span className="flex shrink-0 items-center gap-2">
                 {it.state === "uploading" && <Badge>Uploading</Badge>}
                 {it.state === "done" && <Badge tone="ok">Uploaded</Badge>}
                 {it.state === "error" && <Badge tone="danger">Failed</Badge>}

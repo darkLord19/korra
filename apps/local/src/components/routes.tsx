@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { yearMonthSchema } from "@korra/backend/schemas";
-import { Alert, MonthScreen, PackScreen, SettingsScreen, TrackerScreen, OnboardingScreen, currentMonthIST, errorMessage, useApi, useNav, type SettingsSlots } from "@korra/ui";
+import { Alert, MonthScreen, PackScreen, SettingsScreen, TrackerScreen, OnboardingScreen, Stepper, currentMonthIST, errorMessage, useApi, useNav, type SettingsSlots } from "@korra/ui";
 import { setFlow, useFlow } from "@/lib/flow";
 import { fileHeldInvoice, holdInvoice } from "@/lib/pending-invoice";
 import { BackupPanel, DataPanel } from "./DataPanels";
@@ -14,7 +14,7 @@ const Loading = () => <p className="text-sm text-muted" role="status">Loading...
 
 export const OnboardingRoute = () => (
   <OnboardingScreen
-    step="Step 1 of 3 · Your details"
+    step={<Stepper current={1} />}
     onSaved={(invoice) => { holdInvoice(invoice); setFlow("started"); }}
   />
 );
@@ -57,7 +57,7 @@ export function MonthRoute() {
 
   if (error) return <Alert tone="danger">{error}</Alert>;
   if (month === null || !ready) return <Loading />;
-  return <MonthScreen key={month} month={month} mode={flow === "tracking" ? "full" : "edf"} />;
+  return <MonthScreen key={month} month={month} mode={flow === "tracking" ? "full" : "edf"} {...(flow === "tracking" ? {} : { step: <Stepper current={2} /> })} />;
 }
 
 /** `/pack?id=...` */
@@ -67,7 +67,7 @@ export function PackRoute() {
   if (!id) return <Alert tone="danger">No pack was chosen.</Alert>;
   return (
     <>
-      <PackScreen key={id} packId={id} />
+      <PackScreen key={id} packId={id} {...(flow === "tracking" ? {} : { step: <Stepper current={3} /> })} />
       {flow !== "tracking" && <KeepTrackingCard />}
     </>
   );

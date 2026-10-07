@@ -18,9 +18,9 @@ export function OnboardingScreen({ initial, step, onSaved }: {
   if (!ob) return error ? <Alert tone="danger">{error}</Alert> : <p className="text-sm text-muted" role="status">Loading...</p>;
   return (
     <div className="mx-auto max-w-2xl space-y-6">
+      {step}
       <div>
-        {step && <div className="text-sm font-medium text-muted">{step}</div>}
-        <h1 className="text-3xl font-semibold">Set up your details</h1>
+        <h1 className="text-2xl font-semibold sm:text-3xl">Set up your details</h1>
         <p className="mt-2 text-sm text-muted">These go on every EDF. You do this once and can change it later.</p>
       </div>
       <Card aria-labelledby="profile-h">

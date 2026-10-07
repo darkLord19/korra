@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
+import { Stepper } from "./components/Stepper";
 import { KorraApiError } from "./errors";
 import { ProfileForm } from "./forms/ProfileForm";
 import { MonthScreen } from "./screens/MonthScreen";
@@ -27,8 +28,9 @@ describe("month view", () => {
     expect(screen.getByText("Fix these before you can generate the pack:")).toBeTruthy();
     expect(screen.getByText(/Check SAC code on invoice INV-1: Korra was only 60% sure/)).toBeTruthy();
     expect(screen.getByText(/Your profile is missing PAN/)).toBeTruthy();
-    const links = screen.getAllByRole("link", { name: "Go to it" });
-    expect(links.map((l) => l.getAttribute("href"))).toEqual(["#inv-inv1-sacCode", "/onboarding"]);
+    const links = within(screen.getByText("Fix these before you can generate the pack:").parentElement!).getAllByRole("link");
+    expect(links.map((l) => l.textContent)).toEqual(["Open your details", "Go to SAC code"]);
+    expect(links.map((l) => l.getAttribute("href"))).toEqual(["/onboarding", "#inv-inv1-sacCode"]);
     expect(screen.queryByRole("button", { name: "Generate EDF pack" })).toBeNull();
   });
 
@@ -120,7 +122,7 @@ describe("month view", () => {
     const state = monthState({ invoices: [invoice()] });
     render(<Wrap api={fakeApi()}><MonthView month="2026-09" state={state} banks={[bank]} packs={[]} mode="edf" /></Wrap>);
 
-    expect(screen.getByRole("heading", { name: "Step 2 of 3 · Your September 2026 invoices" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Your September 2026 invoices" })).toBeTruthy();
     expect(screen.queryByRole("link", { name: /Previous month/ })).toBeNull();
     expect(screen.queryByRole("link", { name: /Next month/ })).toBeNull();
     expect(screen.getByLabelText("Change month")).toBeTruthy();
@@ -131,7 +133,7 @@ describe("month view", () => {
 
     expect(screen.getByRole("heading", { name: "Documents" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Invoices" })).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "Step 3 · Download your EDF pack" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Your EDF pack" })).toBeTruthy();
 
     expect(screen.queryByRole("heading", { name: "Payments" })).toBeNull();
     expect(screen.queryByRole("heading", { name: /Matches/ })).toBeNull();
@@ -176,13 +178,15 @@ describe("month view", () => {
     });
     const { container } = render(<Wrap api={fakeApi()}><MonthView month="2026-09" state={state} banks={[bank]} packs={[]} mode="edf" /></Wrap>);
 
-    const links = screen.getAllByRole("link", { name: "Go to it" });
+    // Missing fields first, then flags, then the rest.
+    const links = within(screen.getByText("Fix these before you can generate the pack:").parentElement!).getAllByRole("link");
+    expect(links.map((l) => l.textContent)).toEqual(["Open your details", "Add Client address", "Go to Invoice amount", "Go to upload", "See documents"]);
     expect(links.map((l) => l.getAttribute("href"))).toEqual([
-      "#upload",
-      "#documents",
       "/onboarding",
       "#inv-inv1-clientAddress",
       "#inv-inv1-amount",
+      "#upload",
+      "#documents",
     ]);
 
     expect(container.querySelector("#upload")).toBeTruthy();
@@ -519,8 +523,9 @@ describe("profile form: filling it from an invoice", () => {
 describe("onboarding screen", () => {
   it("renders the optional step indicator", async () => {
     const onboarding = { profile: null, banks: [bank], complete: false };
-    render(<Wrap api={fakeApi({ getOnboarding: vi.fn().mockResolvedValue(onboarding) })}><OnboardingScreen step="Step 1 of 3 · Your details" /></Wrap>);
-    expect(await screen.findByText("Step 1 of 3 · Your details")).toBeTruthy();
+    render(<Wrap api={fakeApi({ getOnboarding: vi.fn().mockResolvedValue(onboarding) })}><OnboardingScreen step={<Stepper current={1} />} /></Wrap>);
+    expect(await screen.findByRole("list", { name: "Progress" })).toBeTruthy();
+    expect(screen.getByRole("listitem", { current: "step" }).textContent).toContain("Set up");
     expect(screen.getByRole("heading", { name: "Set up your details" })).toBeTruthy();
   });
 
@@ -530,5 +535,69 @@ describe("onboarding screen", () => {
     expect(screen.queryByText("Your AD banks")).toBeNull();
     expect(screen.queryByText(/one pack per bank/)).toBeNull();
     expect(screen.queryByRole("button", { name: "Add bank" })).toBeNull();
+  });
+});
+
+describe("stepper", () => {
+  it("marks the current step and the earlier ones as done", () => {
+    render(<Stepper current={2} />);
+    const items = within(screen.getByRole("list", { name: "Progress" })).getAllByRole("listitem");
+    expect(items.map((i) => i.getAttribute("aria-current"))).toEqual([null, "step", null]);
+    expect(items[0]!.textContent).toContain("Set up (done)");
+    expect(items[1]!.textContent).not.toContain("(done)");
+    expect(items[2]!.textContent).not.toContain("(done)");
+    expect(items[1]!.textContent).toContain("Upload invoices");
+    expect(items[2]!.textContent).toContain("Download your EDF pack");
+  });
+});
+
+describe("edf month page guidance", () => {
+  it("groups several flagged fields on one invoice into one item with a link to the invoice", () => {
+    const state = monthState({
+      invoices: [invoice()],
+      blockersByBank: [{
+        adBankId: "bank1", adBankName: "Acme Test Bank", placeholderLayout: false,
+        blockers: [
+          { kind: "flagged_field", entity: "invoice", id: "inv1", field: "sacCode", confidence: 0.6 },
+          { kind: "flagged_field", entity: "invoice", id: "inv1", field: "amount", confidence: 0.5 },
+        ],
+      }],
+    });
+    render(<Wrap api={fakeApi()}><MonthView month="2026-09" state={state} banks={[bank]} packs={[]} mode="edf" /></Wrap>);
+    const list = screen.getByText("Fix these before you can generate the pack:").parentElement!;
+    expect(within(list).getAllByRole("listitem")).toHaveLength(1);
+    expect(within(list).getByText(/Confirm 2 fields on invoice INV-1: SAC code, Invoice amount\./)).toBeTruthy();
+    expect(within(list).getByRole("link", { name: "Go to invoice INV-1" }).getAttribute("href")).toBe("#inv-inv1-sacCode");
+  });
+
+  it("shows a status line with counts and the EDF due date", () => {
+    const documents = [{ id: "d1", kind: null, month: "2026-09", filename: "a.pdf", mimeType: "application/pdf", status: "ingesting" as const, attempts: 0, error: null, createdAt: "2026-09-03T00:00:00.000Z" }];
+    const state = monthState({
+      invoices: [invoice(), invoice({ id: "inv2" })],
+      documents,
+      blockersByBank: [{
+        adBankId: "bank1", adBankName: "Acme Test Bank", placeholderLayout: false,
+        blockers: [
+          { kind: "flagged_field", entity: "invoice", id: "inv1", field: "sacCode", confidence: 0.6 },
+          { kind: "missing_field", entity: "invoice", id: "inv2", field: "clientAddress" },
+        ],
+      }],
+    });
+    const { container } = render(<Wrap api={fakeApi()}><MonthView month="2026-09" state={state} banks={[bank]} packs={[]} mode="edf" /></Wrap>);
+    const line = container.querySelector("h1 + div > p")!.textContent!;
+    expect(line).toMatch(/^2 invoices · 1 being read · \d+ to confirm · 1 missing · EDF due /);
+  });
+
+  it("says what to do when there are no invoices, and when the pack is ready", () => {
+    const empty = monthState({ blockersByBank: [{ adBankId: "bank1", adBankName: "Acme Test Bank", placeholderLayout: false, blockers: [{ kind: "no_invoices" }] }] });
+    const { container, unmount } = render(<Wrap api={fakeApi()}><MonthView month="2026-09" state={empty} banks={[bank]} packs={[]} mode="edf" /></Wrap>);
+    expect(container.querySelector("h1 + div > p")!.textContent).toMatch(/^No invoices yet · EDF due /);
+    expect(screen.getByText(/Upload this month.s invoices below/)).toBeTruthy();
+    unmount();
+    const ready = monthState({ invoices: [invoice()], blockersByBank: [{ adBankId: "bank1", adBankName: "Acme Test Bank", placeholderLayout: false, blockers: [] }] });
+    const { container: c2 } = render(<Wrap api={fakeApi()}><MonthView month="2026-09" state={ready} banks={[bank]} packs={[]} mode="edf" /></Wrap>);
+    expect(screen.getByText("Ready to generate your pack")).toBeTruthy();
+    expect(c2.querySelector("h1 + div > p")!.textContent).toMatch(/^Ready to generate your pack · EDF due /);
+    expect(screen.queryByText(/Upload this month.s invoices below/)).toBeNull();
   });
 });

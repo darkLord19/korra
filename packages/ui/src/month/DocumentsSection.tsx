@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import type { AdBankWire, DocumentWire } from "@korra/backend/schemas";
-import { Badge, Button, Card, CardBody, CardHeader } from "../components";
+import { Badge, Button, Card, CardBody, CardHeader, FileName } from "../components";
 import { useNav } from "../context";
 import { usePoll } from "../lib/use-poll";
 import { ManualEntryPanel } from "./ManualEntry";
@@ -32,12 +32,12 @@ export function DocumentsSection({ month, documents, banks, lastSacCode, readOnl
           <ul className="divide-y divide-line">
             {documents.map((d) => (
               <li key={d.id} className="px-5 py-3 text-sm">
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="truncate font-medium">{d.filename}</p>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <FileName name={d.filename} className="font-medium" />
                     {d.status === "failed" && d.error && <p className="mt-1 max-w-prose text-danger">{d.error}</p>}
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex shrink-0 flex-wrap justify-end gap-2">
                     {d.kind && <Badge>{KIND[d.kind]}</Badge>}
                     {d.status === "ingested" && d.kind !== "ack" && <Badge tone="ok">Read</Badge>}
                     {(d.status === "uploaded" || d.status === "ingesting") && <Badge tone="accent">Reading...</Badge>}

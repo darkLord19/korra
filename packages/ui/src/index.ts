@@ -6,7 +6,7 @@ export type { KorraApiErrorInit, KorraApiErrorKind, FormErrors } from "./errors"
 export { KorraProvider, NavProvider, useApi, useNav } from "./context";
 export type { KorraNav, NavLinkProps } from "./context";
 
-export { Alert, Badge, Button, buttonClass, Card, CardBody, CardHeader, cx, Field, Input, Select, Textarea, Table, Td, Th } from "./components";
+export { Alert, Badge, Button, buttonClass, Card, CardBody, CardHeader, cx, Field, Input, Select, Stepper, Textarea, Table, Td, Th } from "./components";
 export { Footer, DISCLAIMER } from "./components/Footer";
 export { Markdown } from "./components/Markdown";
 
