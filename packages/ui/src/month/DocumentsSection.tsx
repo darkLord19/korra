@@ -5,6 +5,7 @@ import { Badge, Button, Card, CardBody, CardHeader, FileName } from "../componen
 import { useNav } from "../context";
 import { usePoll } from "../lib/use-poll";
 import { ManualEntryPanel } from "./ManualEntry";
+import { MonthLinks } from "./MonthLinks";
 
 const KIND: Record<string, string> = { invoice: "Invoice", statement: "Statement", fira: "FIRA", noc: "NOC", ack: "Bank acknowledgement", unknown: "Unrecognised" };
 
@@ -35,6 +36,9 @@ export function DocumentsSection({ month, documents, banks, lastSacCode, readOnl
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     <FileName name={d.filename} className="font-medium" />
+                    {d.kind === "invoice" && d.invoiceMonths.some((m) => m !== month) && (
+                      <p className="mt-1 text-muted">Filed under <MonthLinks months={d.invoiceMonths.filter((m) => m !== month)} /></p>
+                    )}
                     {d.status === "failed" && d.error && <p className="mt-1 max-w-prose text-danger">{d.error}</p>}
                   </div>
                   <div className="flex shrink-0 flex-wrap justify-end gap-2">

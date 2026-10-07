@@ -504,6 +504,20 @@ describe("re-ingest support", () => {
     expect((await ra.payments.links())[pid!]).toEqual({ documentId: doc.id, nocDocumentId: noc.id });
   });
 
+  it("monthsByDocument lists each document's distinct invoice-date months, ascending, owner-scoped", async () => {
+    const ra = createRepos(db, owner(a.id));
+    const d1 = await ra.documents.create({ filename: "1.pdf", mimeType: "application/pdf", month: "2026-10" });
+    const d2 = await ra.documents.create({ filename: "2.pdf", mimeType: "application/pdf", month: "2026-10" });
+    const d3 = await ra.documents.create({ filename: "3.pdf", mimeType: "application/pdf", month: "2026-10" });
+    await ra.invoices.insertExtracted(d1.id, [
+      invoiceFacts({ invoiceDate: f("2026-06-02") }), invoiceFacts({ invoiceDate: f("2026-04-10") }), invoiceFacts({ invoiceDate: f("2026-06-20") }), invoiceFacts({ invoiceDate: f<string>(null, 0) }),
+    ]);
+    await ra.invoices.insertExtracted(d2.id, [invoiceFacts({ invoiceDate: f<string>(null, 0) })]);
+    expect(await ra.invoices.monthsByDocument([d1.id, d2.id, d3.id])).toEqual({ [d1.id]: ["2026-04", "2026-06"] });
+    expect(await ra.invoices.monthsByDocument([])).toEqual({});
+    expect(await createRepos(db, owner(b.id)).invoices.monthsByDocument([d1.id])).toEqual({});
+  });
+
   it("packs.create accepts a caller-chosen id", async () => {
     const ra = createRepos(db, owner(a.id));
     const p = await ra.packs.create({ id: "pack-xyz", month: "2026-10", adBankId: "bank-1", layoutId: "generic", files: [] });

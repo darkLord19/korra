@@ -5,7 +5,7 @@ import { createRepos } from "@korra/db";
 import {
   ForbiddenError, NotFoundError, ValidationError,
   acceptCaInvite, confirmUpload, createInvoiceManually, decideAllocation, deleteAccount, editField, generatePack, getMonthState,
-  getCaInvite, getOnboarding, getPackDownloads, getTracker, inviteCa, isPlaceholderLayout, layoutIdFor, linkNoc, listCaClients, listMyCas,
+  getCaInvite, getOnboarding, getPackDownloads, getTracker, inviteCa, isPlaceholderLayout, layoutIdFor, linkNoc, listCaClients, listDocuments, listMyCas,
   markPackSubmitted, requestUpload, revokeCa, runDailyNotifications, requeueStuckIngests, runIngest, saveBank, saveProfile, suggestProfileFromInvoice, sweepStuckIngests, toWire,
 } from "./index";
 import { caCtx, createTestDeps, createTestOwner, simulateBrowserPut, type TestDeps } from "./testing";
@@ -174,6 +174,18 @@ describe("runIngest", () => {
     expect(st.blockersByBank).toHaveLength(1);
     expect(st.blockersByBank[0]!.blockers).toContainEqual({ kind: "missing_field", entity: "invoice", id: st.invoices[0]!.id, field: "invoiceDate" });
     expect((await getMonthState(o.ctx, "2026-10")).invoices).toEqual([]);
+  });
+
+  it("getMonthState and listDocuments report the months a document's invoices are dated in", async () => {
+    const o = await createTestOwner(deps);
+    await onboard(o.ctx);
+    deps.fixtures["apr.pdf"] = invoiceResult({ invoiceDate: f("2026-04-10") });
+    await upload(deps, o.ctx, { filename: "apr.pdf", mimeType: "application/pdf", bytes: PDF, month: "2026-10" });
+    const st = await getMonthState(o.ctx, "2026-10");
+    expect(st.invoices).toEqual([]);
+    expect(st.documents[0]!.invoiceMonths).toEqual(["2026-04"]);
+    expect((await listDocuments(o.ctx, "2026-10"))[0]!.invoiceMonths).toEqual(["2026-04"]);
+    expect((await getMonthState(o.ctx, "2026-04")).invoices).toHaveLength(1);
   });
 
   it("an invoice with no SAC takes the last used one, as a default below the flag threshold", async () => {

@@ -24,7 +24,9 @@ export async function getMonthState(ctx: Ctx, rawMonth: string): Promise<MonthSt
   const month = parse(getMonthStateInput, rawMonth);
   const r = repos(ctx);
   const m = await loadMonth(r, month);
-  const [payments, links, allAllocations, lastSacCode] = await Promise.all([r.payments.listByMonth(month), r.payments.links(), r.allocations.list(), r.invoices.lastSacCode()]);
+  const [payments, links, allAllocations, lastSacCode, docMonths] = await Promise.all([
+    r.payments.listByMonth(month), r.payments.links(), r.allocations.list(), r.invoices.lastSacCode(), r.invoices.monthsByDocument(m.documents.map((d) => d.id)),
+  ]);
   const invoiceIds = new Set(m.invoices.map((i) => i.facts.id));
   const paymentIds = new Set(payments.map((p) => p.id));
   const allocations = allAllocations.filter((a) => invoiceIds.has(a.invoiceId) || paymentIds.has(a.paymentId));
@@ -37,7 +39,7 @@ export async function getMonthState(ctx: Ctx, rawMonth: string): Promise<MonthSt
 
   return {
     month,
-    documents: m.documents.map(documentWire),
+    documents: m.documents.map((d) => documentWire(d, docMonths[d.id])),
     invoices: m.invoices.map((i) => invoiceWire(i.facts, i.documentId)),
     payments: payments.map((p): PaymentWire => ({ ...toWire(p), documentId: links[p.id]?.documentId ?? null, nocDocumentId: links[p.id]?.nocDocumentId ?? null })),
     allocations: toWire(allocations),

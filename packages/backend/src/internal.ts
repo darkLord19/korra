@@ -38,7 +38,7 @@ export async function rematch(r: Repos): Promise<void> {
   );
 }
 
-export const documentWire = (d: DocumentRecord): DocumentWire => ({
+export const documentWire = (d: DocumentRecord, months: string[] = []): DocumentWire => ({
   id: d.id,
   kind: d.kind,
   month: d.month,
@@ -48,6 +48,7 @@ export const documentWire = (d: DocumentRecord): DocumentWire => ({
   attempts: d.attempts,
   error: d.error,
   createdAt: d.createdAt.toISOString(),
+  invoiceMonths: months,
 });
 
 export const packWire = (p: PackRecord): PackWire => ({

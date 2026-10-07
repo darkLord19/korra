@@ -347,6 +347,19 @@ export function createRepos(db: Db, actor: Actor, opts: RepoOptions = {}) {
         .orderBy(asc(s.invoice.createdAt), asc(s.invoice.id));
       return rows.map(({ inv }) => ({ facts: invoiceFromRow(inv), documentId: inv.documentId, undated: inv.month === null }));
     },
+    /** Per document id: the distinct invoice-date months of its invoices (undated ones skipped), ascending. */
+    async monthsByDocument(documentIds: string[]): Promise<Record<string, string[]>> {
+      if (documentIds.length === 0) return {};
+      const uid = await readOwner();
+      const rows = await db
+        .selectDistinct({ documentId: s.invoice.documentId, month: s.invoice.month })
+        .from(s.invoice)
+        .where(and(eq(s.invoice.userId, uid), inArray(s.invoice.documentId, documentIds), sql`${s.invoice.month} is not null`))
+        .orderBy(asc(s.invoice.month));
+      const out: Record<string, string[]> = {};
+      for (const { documentId, month } of rows) if (documentId && month) (out[documentId] ??= []).push(month);
+      return out;
+    },
     /** SAC code of the user's most recently added invoice that has one (not counting codes Korra itself filled in as a default). */
     async lastSacCode(): Promise<string | null> {
       const uid = await readOwner();

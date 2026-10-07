@@ -8,6 +8,7 @@ import { INVOICE_FIELDS as FIELDS, flaggedCount } from "../lib/fields";
 import { ConfirmAllButton } from "./ConfirmAllButton";
 import { EditableCell } from "./EditableCell";
 import { ManualInvoiceForm } from "./ManualEntry";
+import { MonthLinks } from "./MonthLinks";
 
 const REQUIRED: readonly string[] = REQUIRED_FIELDS.invoice;
 
@@ -22,8 +23,10 @@ const realisationLabel = (r: RealisationWire) => {
 
 export const invoiceAnchor = (id: string, field: string) => `inv-${id}-${field}`;
 
-export function InvoicesSection({ month, invoices, banks, realisations, lastSacCode, readOnly = false, onChanged }: {
+export function InvoicesSection({ month, invoices, banks, realisations, lastSacCode, elsewhere = [], readOnly = false, onChanged }: {
   month: string; invoices: InvoiceWire[]; banks: AdBankWire[]; realisations: Record<string, RealisationWire>; lastSacCode?: string | null | undefined; readOnly?: boolean;
+  /** Other months that this month's uploaded invoices are dated in. */
+  elsewhere?: string[];
   onChanged?: (() => void) | undefined;
 }) {
   const [adding, setAdding] = useState(false);
@@ -39,7 +42,9 @@ export function InvoicesSection({ month, invoices, banks, realisations, lastSacC
         {!readOnly && adding && (
           <ManualInvoiceForm month={month} banks={banks} lastSacCode={lastSacCode} onCancel={() => setAdding(false)} onDone={() => { setAdding(false); onChanged?.(); }} />
         )}
-        {invoices.length === 0 && <p className="text-sm text-muted">{readOnly ? "No invoices for this month." : "No invoices for this month yet. Upload an invoice above."}</p>}
+        {invoices.length === 0 && (elsewhere.length > 0
+          ? <p className="text-sm text-muted">No invoices dated in this month. Invoices from this month's uploads are dated in <MonthLinks months={elsewhere} />.</p>
+          : <p className="text-sm text-muted">{readOnly ? "No invoices for this month." : "No invoices for this month yet. Upload an invoice above."}</p>)}
         {invoices.map((inv) => {
           const flagged = flaggedCount(inv);
           const r = realisations[inv.id];

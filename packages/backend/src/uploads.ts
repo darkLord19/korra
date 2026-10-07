@@ -56,7 +56,10 @@ export async function confirmUpload(ctx: Ctx, rawId: string): Promise<{ document
 }
 
 export async function listDocuments(ctx: Ctx, month?: string): Promise<DocumentWire[]> {
-  return (await repos(ctx).documents.list(month)).map(documentWire);
+  const r = repos(ctx);
+  const docs = await r.documents.list(month);
+  const months = await r.invoices.monthsByDocument(docs.map((d) => d.id));
+  return docs.map((d) => documentWire(d, months[d.id]));
 }
 
 /* ------------------------------ ingest job ------------------------------ */

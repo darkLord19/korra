@@ -34,6 +34,8 @@ export interface DocumentWire {
   attempts: number;
   error: string | null;
   createdAt: string;
+  /** Months of invoices read from this document, by invoice date (not upload month). */
+  invoiceMonths: string[];
 }
 
 export interface PackWire {

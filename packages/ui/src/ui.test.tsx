@@ -106,7 +106,7 @@ describe("month view", () => {
   it("offers 'Enter details by hand' on a failed document and attaches its id", async () => {
     const createPaymentManually = vi.fn().mockResolvedValue({ id: "pay1" });
     const onChanged = vi.fn();
-    const documents = [{ id: "doc9", kind: null, month: "2026-09", filename: "scan.pdf", mimeType: "application/pdf", status: "failed" as const, attempts: 1, error: "Nothing readable", createdAt: "2026-09-03T00:00:00.000Z" }];
+    const documents = [{ id: "doc9", kind: null, month: "2026-09", filename: "scan.pdf", mimeType: "application/pdf", status: "failed" as const, attempts: 1, error: "Nothing readable", createdAt: "2026-09-03T00:00:00.000Z", invoiceMonths: [] }];
     render(<Wrap api={fakeApi({ createPaymentManually })}><MonthView month="2026-09" state={monthState({ documents })} banks={[bank]} packs={[]} onChanged={onChanged} /></Wrap>);
     await userEvent.click(screen.getByRole("button", { name: /Enter details by hand/ }));
     await userEvent.click(screen.getByRole("button", { name: "A payment" }));
@@ -116,6 +116,22 @@ describe("month view", () => {
     await userEvent.click(within(form).getByRole("button", { name: "Save payment" }));
     await waitFor(() => expect(onChanged).toHaveBeenCalled());
     expect(createPaymentManually).toHaveBeenCalledWith({ documentId: "doc9", fields: { date: "2026-09-10", foreignAmount: { minor: "150000", currency: "USD" } } });
+  });
+
+  it("points an upload's invoices at the month they are dated in, and says so in the empty Invoices card", () => {
+    const doc = (invoiceMonths: string[]) => [{ id: "d1", kind: "invoice" as const, month: "2026-10", filename: "apr.pdf", mimeType: "application/pdf", status: "ingested" as const, attempts: 1, error: null, createdAt: "2026-10-03T00:00:00.000Z", invoiceMonths }];
+    const { unmount } = render(<Wrap api={fakeApi()}><MonthView month="2026-10" state={monthState({ documents: doc(["2026-04", "2026-06"]) })} banks={[bank]} packs={[]} /></Wrap>);
+    const docs = screen.getByRole("heading", { name: "Documents" }).closest("#documents") as HTMLElement;
+    expect(docs.textContent).toContain("Filed under April 2026, June 2026");
+    expect(within(docs).getAllByRole("link").map((l) => l.getAttribute("href"))).toEqual(["/months/2026-04", "/months/2026-06"]);
+    const inv = screen.getByRole("heading", { name: "Invoices" }).closest("#invoices") as HTMLElement;
+    expect(inv.textContent).toContain("No invoices dated in this month. Invoices from this month's uploads are dated in April 2026, June 2026.");
+    expect(within(inv).getByRole("link", { name: "April 2026" }).getAttribute("href")).toBe("/months/2026-04");
+    unmount();
+
+    render(<Wrap api={fakeApi()}><MonthView month="2026-10" state={monthState({ documents: doc(["2026-10"]) })} banks={[bank]} packs={[]} /></Wrap>);
+    expect(screen.queryByText(/Filed under/)).toBeNull();
+    expect(screen.getByText("No invoices for this month yet. Upload an invoice above.")).toBeTruthy();
   });
 
   it("mode=\"edf\" hides Payments, Matches and prev/next, and shows Upload, Documents, Invoices and Packs", () => {
@@ -157,7 +173,7 @@ describe("month view", () => {
   });
 
   it("all blocker link targets in PacksSection are visible in EDF mode", () => {
-    const documents = [{ id: "doc1", kind: null, month: "2026-09", filename: "inv.pdf", mimeType: "application/pdf", status: "ingesting" as const, attempts: 1, error: null, createdAt: "2026-09-01T00:00:00.000Z" }];
+    const documents = [{ id: "doc1", kind: null, month: "2026-09", filename: "inv.pdf", mimeType: "application/pdf", status: "ingesting" as const, attempts: 1, error: null, createdAt: "2026-09-01T00:00:00.000Z", invoiceMonths: [] }];
     const state = monthState({
       documents,
       invoices: [invoice({ id: "inv1", invoiceNo: { source: "extracted", confidence: 1, value: "INV-1" }, amount: { source: "extracted", confidence: 0.6, value: { minor: "1000", currency: "USD" } } })],
@@ -571,7 +587,7 @@ describe("edf month page guidance", () => {
   });
 
   it("shows a status line with counts and the EDF due date", () => {
-    const documents = [{ id: "d1", kind: null, month: "2026-09", filename: "a.pdf", mimeType: "application/pdf", status: "ingesting" as const, attempts: 0, error: null, createdAt: "2026-09-03T00:00:00.000Z" }];
+    const documents = [{ id: "d1", kind: null, month: "2026-09", filename: "a.pdf", mimeType: "application/pdf", status: "ingesting" as const, attempts: 0, error: null, createdAt: "2026-09-03T00:00:00.000Z", invoiceMonths: [] }];
     const state = monthState({
       invoices: [invoice(), invoice({ id: "inv2" })],
       documents,
