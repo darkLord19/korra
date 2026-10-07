@@ -58,7 +58,7 @@ export async function renderPdf(pack: ReadyPack, layout: Layout): Promise<Uint8A
   y -= 20;
   text(`Month: ${monthLabel(pack.month)}`, M, 10);
   y -= 14;
-  text(`AD bank: ${pack.adBank.name}   AD code: ${pack.adBank.adCode}`, M, 10);
+  text(`AD bank: ${pack.adBank.name}   AD code: ${pack.adBank.adCode || "____________"}`, M, 10);
   y -= 14;
   if (layout.placeholder) {
     page.drawText(s("Bank-specific format not yet verified — generic layout"), {

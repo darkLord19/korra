@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import ExcelJS from "exceljs";
-import { PDFDocument } from "pdf-lib";
+import { PDFDocument, PDFRawStream, decodePDFRawStream } from "pdf-lib";
 import { money, type DeclarationRow, type ReadyDeclaration } from "@korra/core";
 import { LayoutNotFoundError, listLayouts, renderDeclaration, renderPack } from "./index";
 import { getDeclarationLayout } from "./layouts";
@@ -41,6 +41,17 @@ function ready(rows: DeclarationRow[], bankName = "ICICI Bank"): ReadyDeclaratio
     warnings: [],
     generatedAt: "2027-01-05T00:00:00.000Z",
   } as unknown as ReadyDeclaration;
+}
+
+/** True when the PDF draws `needle` (ASCII) in one text-show operation: pdf-lib writes standard-font text as hex in Flate streams. */
+async function pdfDraws(bytes: Uint8Array, needle: string): Promise<boolean> {
+  const doc = await PDFDocument.load(bytes);
+  const hex = [...needle].map((c) => c.charCodeAt(0).toString(16).padStart(2, "0")).join("").toUpperCase();
+  for (const [, obj] of doc.context.enumerateIndirectObjects()) {
+    if (!(obj instanceof PDFRawStream)) continue;
+    if (Buffer.from(decodePDFRawStream(obj).decode()).toString("latin1").toUpperCase().includes(hex)) return true;
+  }
+  return false;
 }
 
 const file = (r: Awaited<ReturnType<typeof renderDeclaration>>, ext: string) => {
@@ -112,6 +123,16 @@ describe("renderDeclaration", () => {
     expect(r3.getCell(col("Status")).value).toContain("reduction requested (Reg. 6)");
     expect(r3.getCell(col("Realised amount")).value).toBe(10);
     expect(ws.views[0]).toMatchObject({ state: "frozen", ySplit: 1 });
+  });
+
+  it("draws a blank AD code line when the code is empty, and never 'undefined'", async () => {
+    const d = ready([row(1)]);
+    (d as { adBank: { adCode: string } }).adBank.adCode = "";
+    const bytes = file(await renderDeclaration(d, "declaration-generic"), ".pdf").bytes;
+    expect(await pdfDraws(bytes, "AD code: ____________")).toBe(true);
+    expect(await pdfDraws(bytes, "undefined")).toBe(false);
+    const withCode = file(await renderDeclaration(ready([row(1)]), "declaration-generic"), ".pdf").bytes;
+    expect(await pdfDraws(withCode, "AD code: 6390001")).toBe(true);
   });
 
   it("renders an A4 pdf that paginates, with a footer, and survives non-Latin text", async () => {

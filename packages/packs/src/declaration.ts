@@ -156,7 +156,7 @@ async function renderDeclarationPdf(d: ReadyDeclaration, layout: DeclarationLayo
 
   text(TITLE, M, 13, bold);
   y -= 20;
-  text(`AD bank: ${d.adBank.name}   AD code: ${d.adBank.adCode}`, M, 10);
+  text(`AD bank: ${d.adBank.name}   AD code: ${d.adBank.adCode || "____________"}`, M, 10);
   y -= 14;
   text(`Period: ${d.periodLabel}`, M, 10);
   y -= 14;

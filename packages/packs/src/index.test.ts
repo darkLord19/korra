@@ -119,6 +119,18 @@ describe("@korra/packs", () => {
     expect(ws.views[0]).toMatchObject({ state: "frozen", ySplit: 1 });
   });
 
+  it("draws a blank AD code line when the code is empty, and never 'undefined'", async () => {
+    for (const layout of ["generic", "icici"]) {
+      const pack = asReadyPackForTest([row(1)]);
+      (pack as { adBank: { adCode: string } }).adBank.adCode = "";
+      const bytes = file(await renderPack(pack, layout, []), ".pdf").bytes;
+      expect(await pdfDraws(bytes, "AD code: ____________")).toBe(true);
+      expect(await pdfDraws(bytes, "undefined")).toBe(false);
+    }
+    const withCode = file(await renderPack(asReadyPackForTest([row(1)]), "generic", []), ".pdf").bytes;
+    expect(await pdfDraws(withCode, "AD code: 6390001")).toBe(true);
+  });
+
   it("renders A4 pdf that paginates, and survives non-Latin text and rupee sign", async () => {
     const small = await renderPack(asReadyPackForTest([row(1)]), "generic", []);
     const rows = Array.from({ length: 60 }, (_, i) =>
@@ -241,6 +253,15 @@ describe("@korra/packs", () => {
       // FEMA undertaking says "services", not the form's leftover "goods".
       expect(await pdfDraws(bytes, "above mentioned services under the extant")).toBe(true);
       expect(await pdfDraws(bytes, "See annexure")).toBe(false);
+    });
+
+    it("renders with an empty AD code, leaving the AD Code box blank", async () => {
+      const pack = hdfcPack(1);
+      (pack as { adBank: { adCode: string } }).adBank.adCode = "";
+      const bytes = file(await renderPack(pack, "hdfc", []), ".pdf").bytes;
+      expect(await PDFDocument.load(bytes)).toBeTruthy();
+      expect(await pdfDraws(bytes, "AD Code:")).toBe(true);
+      expect(await pdfDraws(bytes, "undefined")).toBe(false);
     });
 
     it("moves more than 4 invoices to an annexure page", async () => {

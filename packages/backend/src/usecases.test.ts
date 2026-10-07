@@ -5,7 +5,7 @@ import {
   ForbiddenError, NotFoundError, ValidationError,
   acceptCaInvite, confirmUpload, decideAllocation, deleteAccount, editField, generatePack, getMonthState,
   getCaInvite, getOnboarding, getPackDownloads, getTracker, inviteCa, isPlaceholderLayout, layoutIdFor, linkNoc, listCaClients, listMyCas,
-  markPackSubmitted, requestUpload, revokeCa, runDailyNotifications, requeueStuckIngests, runIngest, saveProfile, sweepStuckIngests, toWire,
+  markPackSubmitted, requestUpload, revokeCa, runDailyNotifications, requeueStuckIngests, runIngest, saveBank, saveProfile, sweepStuckIngests, toWire,
 } from "./index";
 import { caCtx, createTestDeps, createTestOwner, simulateBrowserPut, type TestDeps } from "./testing";
 import { PDF, deelCsv, firaResult, invoiceResult, f, onboard, upload, usd } from "./helpers.test-util";
@@ -34,6 +34,29 @@ describe("onboarding", () => {
     const ob = await getOnboarding(o.ctx);
     expect(ob.complete).toBe(true);
     expect(ob.profile?.iec).toBeNull();
+  });
+
+  it("saveBank treats the AD code as optional and stores \"\" when it is missing or blank", async () => {
+    const o = await createTestOwner(deps);
+    expect((await saveBank(o.ctx, { name: "HDFC Bank" })).adCode).toBe("");
+    expect((await saveBank(o.ctx, { name: "Axis Bank", adCode: "" })).adCode).toBe("");
+    expect((await saveBank(o.ctx, { name: "ICICI Bank", adCode: "   " })).adCode).toBe("");
+    expect((await getOnboarding(o.ctx)).banks.map((b) => b.adCode)).toEqual(["", "", ""]);
+    await expect(saveBank(o.ctx, { name: "  " })).rejects.toBeInstanceOf(ValidationError);
+  });
+
+  it("saveBank normalises a provided AD code (upper-case, no spaces) without enforcing a format", async () => {
+    const o = await createTestOwner(deps);
+    expect((await saveBank(o.ctx, { name: "A", adCode: " 639 0002 " })).adCode).toBe("6390002");
+    expect((await saveBank(o.ctx, { name: "B", adCode: "ab-12x" })).adCode).toBe("AB-12X");
+    await expect(saveBank(o.ctx, { name: "C", adCode: "1".repeat(21) })).rejects.toBeInstanceOf(ValidationError);
+  });
+
+  it("saveBank can clear an AD code on an existing bank", async () => {
+    const o = await createTestOwner(deps);
+    const bank = await saveBank(o.ctx, { name: "HDFC Bank", adCode: "6390001" });
+    const cleared = await saveBank(o.ctx, { id: bank.id, name: "HDFC Bank", adCode: "" });
+    expect(cleared).toEqual({ id: bank.id, name: "HDFC Bank", adCode: "" });
   });
 });
 

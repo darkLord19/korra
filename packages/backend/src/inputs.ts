@@ -37,7 +37,9 @@ export const saveProfileInput = z.object({
 });
 export type SaveProfileInput = z.input<typeof saveProfileInput>;
 
-export const saveBankInput = z.object({ id: id.optional(), name: trimmed, adCode: trimmed });
+/** Optional: the bank can fill the AD code in on the EDF. "" means not provided. No strict format: a wrong-format rejection is worse than accepting it. */
+const adCodeSchema = z.string().trim().transform((s) => s.toUpperCase().replace(/\s+/g, "")).pipe(z.string().max(20, "AD code is too long")).default("");
+export const saveBankInput = z.object({ id: id.optional(), name: trimmed, adCode: adCodeSchema });
 export type SaveBankInput = z.input<typeof saveBankInput>;
 
 /* ------------------------------- uploads ------------------------------- */
