@@ -4,7 +4,7 @@ import { gzipSync } from "node:zlib";
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { readBackup, tamper } from "./backup-file";
 import { makeInvoicePdf } from "./invoice-pdf";
-import { completeOnboarding, expectPrivate, generateEdfPack, MONTH, watchPrivacy } from "./support";
+import { addPaymentsAndMatches, completeOnboarding, enterTracking, expectPrivate, generateEdfPack, MONTH, watchPrivacy } from "./support";
 
 const SAFARI_UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1";
 
@@ -82,16 +82,31 @@ test.describe("backup, restore and delete", () => {
     const seen = await watchPrivacy(page, context);
 
     await completeOnboarding(page);
+
+    // Storage warning is absent before tracking
+    await page.goto(`/month?m=${MONTH}`);
+    await expect(storageWarning(page)).toHaveCount(0);
+
     await generateEdfPack(page, origin);
     const packUrl = new URL(page.url()).pathname + new URL(page.url()).search;
 
-    // A pack was just generated: the reminder appears, once.
+    // Storage warning is present on the nudge card
+    await expect(storageWarning(page)).toBeVisible();
+
+    // Enter tracking mode
+    await enterTracking(page);
+
+    // A pack was just generated: the reminder appears in tracking mode, once.
     await expect(reminder(page)).toBeVisible();
     await expect(reminder(page).getByText("Your pack is ready.")).toBeVisible();
     await reminder(page).getByRole("button", { name: "Later" }).click();
     await expect(reminder(page)).toHaveCount(0);
 
+    // Add match and hand payment in full mode
+    await addPaymentsAndMatches(page);
+
     // Record the submission with an acknowledgement, like the main flow does.
+    await page.goto(packUrl);
     await page.getByTestId("file-input").setInputFiles({ name: "bank-ack.pdf", mimeType: "application/pdf", buffer: await makeInvoicePdf(["Acknowledged by the bank"]) });
     await expect(page.getByText("Uploaded", { exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Mark as submitted" }).click();
@@ -118,10 +133,14 @@ test.describe("backup, restore and delete", () => {
     await expect(dialog.getByRole("button", { name: "Delete everything" })).toBeDisabled();
     await dialog.getByLabel("Type DELETE to confirm").fill("DELETE");
     await dialog.getByRole("button", { name: "Delete everything" }).click();
+    await expect(page).toHaveURL(/\/$/);
+    await expect(page.getByRole("heading", { name: "Your export declaration forms, ready for the bank." })).toBeVisible();
+    await page.getByRole("link", { name: "Prepare my EDF" }).click();
     await expect(page).toHaveURL(/\/onboarding$/);
     await expect(page.getByRole("heading", { name: "Set up your details" })).toBeVisible();
     expect(await page.evaluate(() => localStorage.getItem("korra.lastBackupAt"))).toBeNull();
     await expect(page.getByLabel("Legal name")).toHaveValue("");
+    await enterTracking(page);
     await page.goto("/tracker");
     await expect(page.getByRole("row", { name: /INV-2026-014/ })).toHaveCount(0);
     await page.goto("/settings");
@@ -168,6 +187,7 @@ test.describe("backup, restore and delete", () => {
     const origin = new URL(baseURL!).origin;
     const seen = await watchPrivacy(page, context);
     await completeOnboarding(page);
+    await enterTracking(page);
     const good = await backUpFromSettings(page, testInfo.outputPath("good.korra"));
 
     const bad: Record<string, { file: Buffer | string; message: RegExp }> = {
@@ -201,7 +221,7 @@ test.describe("backup, restore and delete", () => {
     }
 
     // Nothing was touched: not even after a full reload, and the app keeps working.
-    await page.goto("/");
+    await page.goto("/month");
     await expect(page).toHaveURL(/\/month\?m=\d{4}-\d{2}$/);
     await page.goto("/settings");
     await expect(page.getByLabel("Legal name")).toHaveValue("Jane Dev");
@@ -214,9 +234,11 @@ test.describe("backup, restore and delete", () => {
     const origin = new URL(baseURL!).origin;
     const seen = await watchPrivacy(page, context);
     await completeOnboarding(page);
+    await enterTracking(page);
     const good = await backUpFromSettings(page, testInfo.outputPath("good.korra"));
 
     const other = await context.newPage();
+    await enterTracking(other);
     await other.goto("/settings");
     await expect(other.getByRole("heading", { name: "Settings" })).toBeVisible();
 
@@ -244,6 +266,7 @@ test.describe("persistent storage", () => {
   test("Settings and the warning follow whatever this browser answers", async ({ page, context, baseURL }) => {
     const origin = new URL(baseURL!).origin;
     const seen = await watchPrivacy(page, context);
+    await enterTracking(page);
     await page.goto("/settings");
     await expect(backupPanel(page).getByText(/^Storage: (protected|not protected)$/)).toBeVisible();
     const persisted = await page.evaluate(() => navigator.storage.persisted());
@@ -254,6 +277,7 @@ test.describe("persistent storage", () => {
 
   test("granted: shown as protected, no warning", async ({ page }) => {
     await stubPersist(page, true);
+    await enterTracking(page);
     await page.goto("/settings");
     await expect(backupPanel(page).getByText("Storage: protected")).toBeVisible();
     await expect(storageWarning(page)).toHaveCount(0);
@@ -261,8 +285,9 @@ test.describe("persistent storage", () => {
 
   test("denied: a warning on every page that cannot be dismissed, linking to Settings", async ({ page }) => {
     await stubPersist(page, false);
-    await page.goto("/onboarding");
-    await expect(page.getByRole("heading", { name: "Set up your details" })).toBeVisible();
+    await enterTracking(page);
+    await page.goto("/month");
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
     const warning = storageWarning(page);
     await expect(warning).toBeVisible();
     await expect(warning).toContainText("Back up regularly");
@@ -281,14 +306,16 @@ test.describe("persistent storage", () => {
     test.use({ userAgent: SAFARI_UA });
     test("the warning recommends Add to Home Screen or a desktop browser", async ({ page }) => {
       await stubPersist(page, false);
-      await page.goto("/onboarding");
+      await enterTracking(page);
+      await page.goto("/month");
       await expect(storageWarning(page)).toContainText("Add Korra to your Home Screen");
       await expect(storageWarning(page)).toContainText("desktop browser");
     });
     test("and says nothing about it when storage is protected", async ({ page }) => {
       await stubPersist(page, true);
-      await page.goto("/onboarding");
-      await expect(page.getByRole("heading", { name: "Set up your details" })).toBeVisible();
+      await enterTracking(page);
+      await page.goto("/month");
+      await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
       await expect(page.getByText("Home Screen")).toHaveCount(0);
     });
   });
@@ -306,7 +333,9 @@ test.describe("backup reminders", () => {
     await settle(page);
     await expect(reminder(page)).toHaveCount(0);
 
-    await completeOnboarding(page); // ends with a fresh page load of "/", with data and no backup ever
+    await completeOnboarding(page);
+    await enterTracking(page);
+    await page.goto("/month");
     await expect(reminder(page)).toBeVisible();
     await expect(reminder(page)).toContainText("Back up your data");
     await expect(reminder(page)).toContainText("not backed up yet");
@@ -323,9 +352,10 @@ test.describe("backup reminders", () => {
     const newSession = async (lastBackupDaysAgo: number) => {
       await page.evaluate((days) => {
         localStorage.setItem("korra.lastBackupAt", String(Date.now() - days * 86_400_000));
+        localStorage.setItem("korra.flow", "tracking");
         sessionStorage.clear();
       }, lastBackupDaysAgo);
-      await page.goto("/");
+      await page.goto("/month");
       await expect(page).toHaveURL(/\/month\?m=\d{4}-\d{2}$/);
       await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
       await settle(page);
@@ -346,8 +376,12 @@ test.describe("backup reminders", () => {
     expect(Date.now() - stored).toBeLessThan(60_000);
 
     // A garbage timestamp means "never".
-    await page.evaluate(() => { localStorage.setItem("korra.lastBackupAt", "yesterday"); sessionStorage.clear(); });
-    await page.goto("/");
+    await page.evaluate(() => {
+      localStorage.setItem("korra.lastBackupAt", "yesterday");
+      localStorage.setItem("korra.flow", "tracking");
+      sessionStorage.clear();
+    });
+    await page.goto("/month");
     await expect(reminder(page)).toContainText("not backed up yet");
 
     expectPrivate(seen, origin);
@@ -358,10 +392,10 @@ test.describe("backup reminders", () => {
     const origin = new URL(baseURL!).origin;
     const seen = await watchPrivacy(page, context);
     await completeOnboarding(page);
+    await enterTracking(page);
     // Pretend the person backed up recently, so only the pack can raise the reminder.
     await page.evaluate(() => { localStorage.setItem("korra.lastBackupAt", String(Date.now())); sessionStorage.clear(); });
-    await page.goto("/");
-    await expect(page).toHaveURL(/\/month\?m=\d{4}-\d{2}$/);
+    await page.goto(`/month?m=${MONTH}`);
     await settle(page);
     await expect(reminder(page)).toHaveCount(0);
 

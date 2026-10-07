@@ -2,7 +2,7 @@
 import NextLink from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, type ReactNode } from "react";
-import { KorraProvider, type KorraApi, type KorraNav, type NavLinkProps } from "@korra/ui";
+import { KorraProvider, currentMonthIST, type KorraApi, type KorraNav, type NavLinkProps } from "@korra/ui";
 
 const LocalLink = (props: NavLinkProps) => <NextLink {...props} />;
 
@@ -11,7 +11,7 @@ const LocalLink = (props: NavLinkProps) => <NextLink {...props} />;
  * /month?m=YYYY-MM and /pack?id=...
  */
 export const localHrefs: KorraNav["hrefs"] = {
-  home: () => "/",
+  home: () => `/month?m=${encodeURIComponent(currentMonthIST())}`,
   onboarding: () => "/onboarding",
   month: (month) => `/month?m=${encodeURIComponent(month)}`,
   pack: (packId) => `/pack?id=${encodeURIComponent(packId)}`,

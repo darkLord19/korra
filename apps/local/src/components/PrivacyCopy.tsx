@@ -19,10 +19,15 @@ export const PRIVACY_LEAD = "Your documents and details are stored only in this 
  */
 export function UsageStatement() {
   return (
-    <p>
-      Korra does not use analytics or tracking. Your browser downloads the app itself from Korra&apos;s web host, and that is the only
-      thing it contacts: nothing about you or your documents is sent anywhere.
-    </p>
+    <>
+      <p>
+        Korra does not use analytics or tracking. Your browser downloads the app itself from Korra&apos;s web host, and that is the only
+        thing it contacts: nothing about you or your documents is sent anywhere.
+      </p>
+      <p className="mt-2">
+        Joining the waitlist opens Tally&apos;s site in a new tab, and Korra sends nothing there. Only what you type into Tally goes to Tally.
+      </p>
+    </>
   );
 }
 

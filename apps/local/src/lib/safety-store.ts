@@ -135,6 +135,7 @@ export function setNoticeForNextLoad(message: string): void {
 }
 
 function maybePrompt(reason: PromptReason, hasData: boolean, now: number): void {
+  if (reason === "stale" && state.prompt !== null) return;
   const lastBackupAt = parseLastBackup(ls.get(LAST_BACKUP_KEY));
   if (!promptDue(reason, { now, lastBackupAt, hasData, shown: shownReasons() })) return;
   markShown(reason);

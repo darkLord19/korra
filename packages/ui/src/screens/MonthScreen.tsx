@@ -16,7 +16,7 @@ export interface MonthData {
  * The owner's month page: loads the month through `KorraApi`, reloads after every change and while documents
  * are being read. Pass `initial` when the app already fetched it (server rendering) to skip the first load.
  */
-export function MonthScreen({ month, initial, uploadDescription }: { month: string; initial?: MonthData; uploadDescription?: ReactNode }) {
+export function MonthScreen({ month, initial, uploadDescription, mode = "full" }: { month: string; initial?: MonthData; uploadDescription?: ReactNode; mode?: "full" | "edf" }) {
   const api = useApi();
   const { data, error, reload } = useLoaded<MonthData>(
     async () => {
@@ -31,6 +31,7 @@ export function MonthScreen({ month, initial, uploadDescription }: { month: stri
     <>
       {error && <div className="mb-4"><Alert tone="danger">{error}</Alert></div>}
       <MonthView month={month} state={data.state} banks={data.banks} packs={data.packs} onChanged={() => void reload()} onPoll={() => void reload()}
+        mode={mode}
         {...(uploadDescription !== undefined ? { uploadDescription } : {})} />
     </>
   );

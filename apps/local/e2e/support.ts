@@ -47,9 +47,11 @@ export function expectPrivate(seen: Privacy, origin: string): void {
   expect(seen.problems, "console errors and warnings").toEqual([]);
 }
 
-/** First run: "/" leads to onboarding; add a bank, fill in the profile, land on the month. Then a reload remembers it. */
+/** First run: "/" shows landing page; click "Prepare my EDF", add bank & profile, land on month. Then a reload shows "Continue your EDF". */
 export async function completeOnboarding(page: Page): Promise<void> {
   await page.goto("/");
+  await expect(page.getByRole("heading", { name: "Your export declaration forms, ready for the bank." })).toBeVisible();
+  await page.getByRole("link", { name: "Prepare my EDF" }).click();
   await expect(page).toHaveURL(/\/onboarding$/);
   await expect(page.getByRole("heading", { name: "Set up your details" })).toBeVisible();
   await page.getByLabel("Bank name").fill("Acme Test Bank");
@@ -64,13 +66,33 @@ export async function completeOnboarding(page: Page): Promise<void> {
   await page.getByLabel("Default AD bank").selectOption({ label: "Acme Test Bank (6390001)" });
   await page.getByRole("button", { name: "Save and continue" }).click();
   await expect(page).toHaveURL(/\/month\?m=\d{4}-\d{2}$/);
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
 
-  // A full reload boots the database again from IndexedDB: onboarding is remembered, "/" goes to the month.
+  // A full reload: "/" shows the landing page with "Continue your EDF".
   await page.goto("/");
-  await expect(page).toHaveURL(/\/month\?m=\d{4}-\d{2}$/);
+  await expect(page.getByRole("link", { name: "Continue your EDF" })).toBeVisible();
 }
 
-/** From a finished onboarding to a generated EDF pack: upload the CSV and a PDF, review, match, hand-typed payment, generate. */
+/** Sets the flow flag to "tracking", either through the nudge card or via page.evaluate. */
+export async function enterTracking(page: Page): Promise<void> {
+  const keepTrackingBtn = page.getByRole("button", { name: "Keep tracking in this browser" });
+  if (await keepTrackingBtn.isVisible().catch(() => false)) {
+    await keepTrackingBtn.click();
+    await expect(page).toHaveURL(/\/tracker$/);
+  } else {
+    await page.addInitScript(() => {
+      localStorage.setItem("korra.flow", "tracking");
+    });
+    if (page.url() !== "about:blank") {
+      await page.evaluate(() => {
+        localStorage.setItem("korra.flow", "tracking");
+        window.dispatchEvent(new Event("storage"));
+      });
+    }
+  }
+}
+
+/** From a finished onboarding to a generated EDF pack in EDF mode: upload, review, fix address, generate. */
 export async function generateEdfPack(page: Page, origin: string): Promise<void> {
   // Upload the Deel CSV and an invoice PDF (a real text-layer PDF, read by pdf.js in the browser).
   await page.goto(`/month?m=${MONTH}`);
@@ -80,10 +102,6 @@ export async function generateEdfPack(page: Page, origin: string): Promise<void>
   ]);
   const invoice = page.getByRole("article", { name: "Invoice INV-2026-014" });
   await expect(invoice).toBeVisible();
-
-  // Confirm the proposed match.
-  await page.getByRole("button", { name: "Confirm", exact: true }).click();
-  await expect(page.getByRole("heading", { name: /Confirmed \(1\)/ })).toBeVisible();
 
   // Every locally extracted field is "Check this" (confidence 0.6): "I've checked these" confirms them in one click.
   await expect(invoice.getByText("Check this").first()).toBeVisible();
@@ -103,6 +121,23 @@ export async function generateEdfPack(page: Page, origin: string): Promise<void>
   await invoice.getByRole("button", { name: "Save" }).click();
   await expect(invoice.getByRole("button", { name: "Edit Client address" })).toContainText("1 Main Street");
 
+  // Generate the pack: four files, downloadable as blob: URLs.
+  await page.getByRole("button", { name: "Generate EDF pack" }).click();
+  await expect(page).toHaveURL(/\/pack\?id=[^&]+$/);
+  await expect(page.getByRole("heading", { name: /EDF pack for/ })).toBeVisible();
+  const downloads = page.getByRole("link", { name: "Download" });
+  await expect(downloads).toHaveCount(4);
+  await expect(page.getByText("Korra does not submit anything for you")).toBeVisible(); // the guide's text, read from the local store
+  for (const href of await downloads.evaluateAll((as) => as.map((a) => (a as HTMLAnchorElement).href))) expect(href).toMatch(new RegExp(`^blob:${origin}/`));
+}
+
+/** Full-mode extras: confirm matches and add a payment by hand. */
+export async function addPaymentsAndMatches(page: Page): Promise<void> {
+  await page.goto(`/month?m=${MONTH}`);
+  // Confirm the proposed match.
+  await page.getByRole("button", { name: "Confirm", exact: true }).click();
+  await expect(page.getByRole("heading", { name: /Confirmed \(1\)/ })).toBeVisible();
+
   // A payment typed in by hand.
   await page.getByRole("button", { name: "Add payment by hand" }).click();
   const payForm = page.getByRole("form", { name: "Add payment by hand" });
@@ -112,13 +147,4 @@ export async function generateEdfPack(page: Page, origin: string): Promise<void>
   await payForm.getByRole("button", { name: "Save payment" }).click();
   await expect(payForm).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Edit Payer" }).filter({ hasText: "Hand Payer Ltd" })).toBeVisible();
-
-  // Generate the pack: four files, downloadable as blob: URLs.
-  await page.getByRole("button", { name: "Generate EDF pack" }).click();
-  await expect(page).toHaveURL(/\/pack\?id=[^&]+$/);
-  await expect(page.getByRole("heading", { name: /EDF pack for/ })).toBeVisible();
-  const downloads = page.getByRole("link", { name: "Download" });
-  await expect(downloads).toHaveCount(4);
-  await expect(page.getByText("Korra does not submit anything for you")).toBeVisible(); // the guide's text, read from the local store
-  for (const href of await downloads.evaluateAll((as) => as.map((a) => (a as HTMLAnchorElement).href))) expect(href).toMatch(new RegExp(`^blob:${origin}/`));
 }

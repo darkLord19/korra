@@ -22,16 +22,17 @@ function describe(b: BlockerWire, invoices: InvoiceWire[], nav: KorraNav): { tex
   }
 }
 
-export function PacksSection({ month, blockersByBank, invoices, packs, readOnly = false, onChanged }: {
+export function PacksSection({ month, blockersByBank, invoices, packs, readOnly = false, onChanged, mode = "full" }: {
   month: string;
   blockersByBank: MonthStateWire["blockersByBank"];
   invoices: InvoiceWire[]; packs: PackWire[]; readOnly?: boolean; onChanged?: (() => void) | undefined;
+  mode?: "full" | "edf";
 }) {
   const nav = useNav();
   const { Link } = nav;
   return (
     <Card aria-labelledby="packs-h" id="packs">
-      <CardHeader id="packs-h" title="EDF packs" description={`${readOnly ? "" : "One pack per AD bank. "}EDFs for ${monthLabel(month)} are due by ${dateLabel(edfDueDate(month))}.`} />
+      <CardHeader id="packs-h" title={mode === "edf" ? "Step 3 · Download your EDF pack" : "EDF packs"} description={`${readOnly ? "" : "One pack per AD bank. "}EDFs for ${monthLabel(month)} are due by ${dateLabel(edfDueDate(month))}.`} />
       <CardBody className="space-y-6">
         {blockersByBank.length === 0 && <p className="text-sm text-muted">{readOnly ? "No AD banks on this account." : "Add an AD bank in your profile to generate a pack."}</p>}
         {blockersByBank.map((b) => (

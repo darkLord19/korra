@@ -39,7 +39,7 @@ KORRA_DEV_INMEMORY=1 pnpm --filter @korra/web dev
 No database or env vars are needed: data lives in the user's browser.
 
 1. **Vercel**: import the GitHub repo, set **Root Directory** to `apps/local`, framework Next.js, and leave the build command as `pnpm build` (it runs `scripts/build.mjs`: the pdf.js worker copy, then a two-pass `next build --webpack` that bakes the strict hash-based CSP in). Keep **Include source files outside of the Root Directory in the Build Step** enabled so the workspace packages resolve. Do not override the build command with plain `next build`: without the hashes the app fails closed and does not start.
-2. Production branch: `main` (create it from `dev` first). No crons, no environment variables.
+2. Production branch: `main` (create it from `dev` first). No crons. Optional environment variable: `NEXT_PUBLIC_KORRA_WAITLIST_URL` — URL to an external Tally waitlist form (opened as a plain link in a new tab; no requests leave the origin). When unset, the waitlist link is hidden.
 3. After the first deploy, check the response headers on `/` carry the strict `Content-Security-Policy` (`script-src 'self' 'wasm-unsafe-eval' 'sha256-...'`, `connect-src 'self'`) and open the app once in a fresh browser profile to confirm it boots.
 
 ### Phase 1 server app (`apps/web`; not deployed in v0)

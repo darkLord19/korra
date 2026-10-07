@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { KorraApiError } from "./errors";
 import { MonthScreen } from "./screens/MonthScreen";
+import { OnboardingScreen } from "./screens/OnboardingScreen";
 import { SettingsScreen } from "./screens/SettingsScreen";
 import { MonthView } from "./month/MonthView";
 import { Wrap, fakeApi, invoice, monthState, testNav } from "./test-utils";
@@ -96,6 +97,81 @@ describe("month view", () => {
     await waitFor(() => expect(onChanged).toHaveBeenCalled());
     expect(createPaymentManually).toHaveBeenCalledWith({ documentId: "doc9", fields: { date: "2026-09-10", foreignAmount: { minor: "150000", currency: "USD" } } });
   });
+
+  it("mode=\"edf\" hides Payments, Matches and prev/next, and shows Upload, Documents, Invoices and Packs", () => {
+    const state = monthState({ invoices: [invoice()] });
+    render(<Wrap api={fakeApi()}><MonthView month="2026-09" state={state} banks={[bank]} packs={[]} mode="edf" /></Wrap>);
+
+    expect(screen.getByRole("heading", { name: "Step 2 of 3 · Your September 2026 invoices" })).toBeTruthy();
+    expect(screen.queryByRole("link", { name: /Previous month/ })).toBeNull();
+    expect(screen.queryByRole("link", { name: /Next month/ })).toBeNull();
+    expect(screen.getByLabelText("Change month")).toBeTruthy();
+
+    expect(screen.getByRole("heading", { name: "Upload" })).toBeTruthy();
+    expect(screen.getByText("Add this month's invoices (PDF, or a Deel export CSV).")).toBeTruthy();
+    expect(screen.queryByLabelText(/What is it\?/)).toBeNull();
+
+    expect(screen.getByRole("heading", { name: "Documents" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Invoices" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Step 3 · Download your EDF pack" })).toBeTruthy();
+
+    expect(screen.queryByRole("heading", { name: "Payments" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: /Matches/ })).toBeNull();
+  });
+
+  it("default mode is unchanged (full mode with Payments, Matches, and prev/next)", () => {
+    const state = monthState({ invoices: [invoice()] });
+    render(<Wrap api={fakeApi()}><MonthView month="2026-09" state={state} banks={[bank]} packs={[]} /></Wrap>);
+
+    expect(screen.getByRole("heading", { name: "September 2026" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: /Previous month/ })).toBeTruthy();
+    expect(screen.getByRole("link", { name: /Next month/ })).toBeTruthy();
+    expect(screen.queryByLabelText("Change month")).toBeNull();
+
+    expect(screen.getByText(/Add this month's invoices, your Deel transactions export/)).toBeTruthy();
+    expect(screen.getByLabelText(/What is it\?/)).toBeTruthy();
+
+    expect(screen.getByRole("heading", { name: "Payments" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: /Matches/ })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "EDF packs" })).toBeTruthy();
+  });
+
+  it("all blocker link targets in PacksSection are visible in EDF mode", () => {
+    const documents = [{ id: "doc1", kind: null, month: "2026-09", filename: "inv.pdf", mimeType: "application/pdf", status: "ingesting" as const, attempts: 1, error: null, createdAt: "2026-09-01T00:00:00.000Z" }];
+    const state = monthState({
+      documents,
+      invoices: [invoice({ id: "inv1", invoiceNo: { source: "extracted", confidence: 1, value: "INV-1" }, amount: { source: "extracted", confidence: 0.6, value: { minor: "1000", currency: "USD" } } })],
+      blockersByBank: [
+        {
+          adBankId: "bank1",
+          adBankName: "Acme Test Bank",
+          placeholderLayout: false,
+          blockers: [
+            { kind: "no_invoices" },
+            { kind: "document_pending", documentId: "doc1" },
+            { kind: "missing_field", entity: "exporter", id: "exp", field: "pan" },
+            { kind: "missing_field", entity: "invoice", id: "inv1", field: "clientAddress" },
+            { kind: "flagged_field", entity: "invoice", id: "inv1", field: "amount", confidence: 0.6 },
+          ],
+        },
+      ],
+    });
+    const { container } = render(<Wrap api={fakeApi()}><MonthView month="2026-09" state={state} banks={[bank]} packs={[]} mode="edf" /></Wrap>);
+
+    const links = screen.getAllByRole("link", { name: "Go to it" });
+    expect(links.map((l) => l.getAttribute("href"))).toEqual([
+      "#upload",
+      "#documents",
+      "/onboarding",
+      "#inv-inv1-clientAddress",
+      "#inv-inv1-amount",
+    ]);
+
+    expect(container.querySelector("#upload")).toBeTruthy();
+    expect(container.querySelector("#documents")).toBeTruthy();
+    expect(container.querySelector("#inv-inv1-clientAddress")).toBeTruthy();
+    expect(container.querySelector("#inv-inv1-amount")).toBeTruthy();
+  });
 });
 
 describe("month screen", () => {
@@ -131,5 +207,14 @@ describe("capabilities", () => {
     render(<Wrap api={fakeApi({ getOnboarding: vi.fn().mockResolvedValue(onboarding) }, { caSharing: true, backup: true })}><SettingsScreen slots={slots} /></Wrap>);
     expect(await screen.findByText("CA panel")).toBeTruthy();
     expect(screen.getByText("Backup panel")).toBeTruthy();
+  });
+});
+
+describe("onboarding screen", () => {
+  it("renders the optional step indicator", async () => {
+    const onboarding = { profile: null, banks: [bank], complete: false };
+    render(<Wrap api={fakeApi({ getOnboarding: vi.fn().mockResolvedValue(onboarding) })}><OnboardingScreen step="Step 1 of 3 · Your details" /></Wrap>);
+    expect(await screen.findByText("Step 1 of 3 · Your details")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Set up your details" })).toBeTruthy();
   });
 });

@@ -40,6 +40,10 @@ export default defineConfig({
     url: `http://localhost:${port}/`,
     reuseExistingServer: false,
     timeout: 600_000,
-    env: { PORT: String(port), NEXT_TELEMETRY_DISABLED: "1" },
+    env: {
+      PORT: String(port),
+      NEXT_TELEMETRY_DISABLED: "1",
+      NEXT_PUBLIC_KORRA_WAITLIST_URL: process.env.NEXT_PUBLIC_KORRA_WAITLIST_URL ?? "https://tally.so/r/mZ1234",
+    },
   },
 });

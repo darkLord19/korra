@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { expect, test } from "@playwright/test";
 import { makeInvoicePdf } from "./invoice-pdf";
-import { completeOnboarding, expectPrivate, generateEdfPack, MONTH, watchPrivacy } from "./support";
+import { addPaymentsAndMatches, completeOnboarding, enterTracking, expectPrivate, generateEdfPack, MONTH, watchPrivacy } from "./support";
 
 function directive(csp: string, name: string): string {
   return csp.split(";").map((d) => d.trim()).find((d) => d.startsWith(`${name} `)) ?? "";
@@ -12,8 +12,37 @@ test("client-only flow: onboarding to EDF pack and tracker, with nothing leaving
   const seen = await watchPrivacy(page, context);
 
   await completeOnboarding(page);
+
+  // In EDF-mode month: Payments, Main nav, and banners are hidden.
+  await page.goto(`/month?m=${MONTH}`);
+  await expect(page.getByRole("heading", { name: "Payments" })).toHaveCount(0);
+  await expect(page.getByRole("navigation", { name: "Main" })).toHaveCount(0);
+  await expect(page.getByRole("region", { name: "Storage warning" })).toHaveCount(0);
+  await expect(page.getByRole("region", { name: "Backup reminder" })).toHaveCount(0);
+
+  // Generate EDF pack in EDF mode.
   await generateEdfPack(page, origin);
 
+  // On the pack page: nudge card is visible.
+  await expect(page.getByRole("heading", { name: /Want Korra to keep watching these invoices/ })).toBeVisible();
+
+  // Waitlist link is present, has target=_blank, and is not clicked.
+  const waitlist = page.getByRole("link", { name: /Get notified when accounts with sync/ });
+  await expect(waitlist).toBeVisible();
+  await expect(waitlist).toHaveAttribute("target", "_blank");
+  await expect(waitlist).toHaveAttribute("rel", /noopener/);
+
+  // "Keep tracking in this browser" sets flow to "tracking", opens tracker, and nav appears.
+  await enterTracking(page);
+  await expect(page).toHaveURL(/\/tracker$/);
+  await expect(page.getByRole("navigation", { name: "Main" })).toBeVisible();
+
+  // In full mode, confirm match and add hand payment.
+  await addPaymentsAndMatches(page);
+
+  // Download a pack file.
+  await page.goto(`/month?m=${MONTH}`);
+  await page.getByRole("link", { name: /^Pack generated/ }).first().click();
   const downloads = page.getByRole("link", { name: "Download" });
   const [download] = await Promise.all([page.waitForEvent("download"), downloads.first().click()]);
   const bytes = readFileSync((await download.path())!);

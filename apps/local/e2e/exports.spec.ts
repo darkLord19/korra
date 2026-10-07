@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import ICAL from "ical.js";
 import JSZip from "jszip";
 import { expect, test, type Download, type Page } from "@playwright/test";
-import { completeOnboarding, expectPrivate, generateEdfPack, MONTH, watchPrivacy } from "./support";
+import { addPaymentsAndMatches, completeOnboarding, enterTracking, expectPrivate, generateEdfPack, MONTH, watchPrivacy } from "./support";
 
 const SAFARI_UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1";
 const LEAD = "Your documents and details are stored only in this browser. Korra has no server copy. Back up regularly.";
@@ -25,7 +25,7 @@ test.describe("first-run privacy notice and the Privacy page", () => {
     const origin = new URL(baseURL!).origin;
     const seen = await watchPrivacy(page, context);
 
-    await page.goto("/");
+    await page.goto("/onboarding");
     await expect(page.getByRole("heading", { name: "Set up your details" })).toBeVisible();
     await expect(notice(page)).toBeVisible();
     await expect(notice(page)).toContainText(LEAD);
@@ -52,6 +52,7 @@ test.describe("first-run privacy notice and the Privacy page", () => {
     await expect(page.getByText("Home Screen")).toHaveCount(0); // not Safari
 
     // Settings has a Privacy section too (data is still empty: Settings needs onboarding data to render its forms).
+    await enterTracking(page);
     await page.goto("/settings");
     await expect(page.getByRole("region", { name: "Privacy" })).toBeVisible();
     await expect(page.getByRole("region", { name: "Privacy" }).getByRole("link", { name: /how your data is handled/i })).toHaveAttribute("href", "/privacy");
@@ -93,9 +94,14 @@ test("calendar and CA exports: built in the browser from the same data the scree
   }
   expect(Object.keys(shown)).toHaveLength(4);
 
-  // Mark it submitted, then add a second invoice by hand that has no payment: it stays open, so it has real deadlines and alerts.
+  // Mark it submitted, then enter tracking and confirm matches + hand payment.
   await page.getByRole("button", { name: "Mark as submitted" }).click();
   await expect(page.getByText(/^Submitted \d/)).toBeVisible();
+
+  await enterTracking(page);
+  await addPaymentsAndMatches(page);
+
+  // Add a second invoice by hand that has no payment: it stays open, so it has real deadlines and alerts.
   await page.goto(`/month?m=${MONTH}`);
   await page.getByRole("button", { name: "Add invoice by hand" }).click();
   const form = page.getByRole("form", { name: "Add invoice by hand" });

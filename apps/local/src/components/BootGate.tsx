@@ -4,6 +4,7 @@ import { Alert, Button } from "@korra/ui";
 import { boot } from "@/lib/boot";
 import { LocalProviders } from "@/lib/nav";
 import { initPersistence, loadSafetyState, useSafety } from "@/lib/safety-store";
+import { useFlow } from "@/lib/flow";
 import { SafetyBanners } from "./SafetyBanners";
 
 type State = { status: "loading" } | { status: "error"; message: string } | { status: "ready"; api: Awaited<ReturnType<typeof boot>>["api"] };
@@ -17,6 +18,7 @@ export function BootGate({ children }: { children: ReactNode }) {
   const [state, setState] = useState<State>({ status: "loading" });
   const [attempt, setAttempt] = useState(0);
   const { lifecycle } = useSafety();
+  const flow = useFlow();
 
   useEffect(() => {
     let live = true;
@@ -57,7 +59,7 @@ export function BootGate({ children }: { children: ReactNode }) {
   }
   return (
     <LocalProviders api={state.api}>
-      <SafetyBanners />
+      {flow === "tracking" && <SafetyBanners />}
       {children}
     </LocalProviders>
   );

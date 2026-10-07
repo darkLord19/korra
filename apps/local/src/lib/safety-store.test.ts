@@ -67,6 +67,14 @@ describe("safety store", () => {
     expect(localStorage.getItem("korra.lastBackupAt")).toBe(String(NOW));
   });
 
+  it("a stale prompt never replaces a pack prompt", async () => {
+    const s = await fresh();
+    s.notifyPackGenerated(() => NOW);
+    expect(s.getSafetyState().prompt).toBe("pack");
+    s.evaluateStalePrompt(true, () => NOW);
+    expect(s.getSafetyState().prompt).toBe("pack");
+  });
+
   it("clearOwnedStorage removes only keys with the app's prefix", async () => {
     const s = await fresh();
     localStorage.setItem("korra.lastBackupAt", "1");
