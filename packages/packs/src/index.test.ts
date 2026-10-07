@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import ExcelJS from "exceljs";
 import JSZip from "jszip";
-import { PDFDocument } from "pdf-lib";
+import { PDFDocument, PDFRawStream, decodePDFRawStream } from "pdf-lib";
 import { money, type EdfRow, type PackDraft, type ReadyPack } from "@korra/core";
 import { LayoutNotFoundError, PACKAGE, listLayouts, renderPack } from "./index";
 import { getLayout } from "./layouts";
@@ -49,6 +49,21 @@ function asReadyPackForTest(rows: EdfRow[], bankName = "ICICI Bank"): ReadyPack 
   return draftLike as unknown as ReadyPack;
 }
 
+/**
+ * True when the PDF draws `needle` (ASCII) in one text-show operation. pdf-lib writes standard-font
+ * text as hex strings inside Flate-compressed content streams, so decode every stream and search hex.
+ */
+async function pdfDraws(bytes: Uint8Array, needle: string): Promise<boolean> {
+  const doc = await PDFDocument.load(bytes);
+  const hex = [...needle].map((c) => c.charCodeAt(0).toString(16).padStart(2, "0")).join("").toUpperCase();
+  for (const [, obj] of doc.context.enumerateIndirectObjects()) {
+    if (!(obj instanceof PDFRawStream)) continue;
+    const text = Buffer.from(decodePDFRawStream(obj).decode()).toString("latin1").toUpperCase();
+    if (text.includes(hex)) return true;
+  }
+  return false;
+}
+
 const file = (r: Awaited<ReturnType<typeof renderPack>>, ext: string) => {
   const f = r.files.find((x) => x.name.endsWith(ext));
   if (!f) throw new Error(`no ${ext}`);
@@ -62,8 +77,9 @@ describe("@korra/packs", () => {
     const l = listLayouts();
     expect(l.map((x) => x.id).sort()).toEqual(["axis", "generic", "hdfc", "icici"]);
     expect(l.find((x) => x.id === "generic")).toMatchObject({ placeholder: false, version: "1" });
-    for (const id of ["icici", "hdfc", "axis"]) {
-      expect(l.find((x) => x.id === id)?.placeholder).toBe(true);
+    expect(l.find((x) => x.id === "hdfc")).toMatchObject({ placeholder: false, version: "1" });
+    for (const id of ["icici", "axis"]) {
+      expect(l.find((x) => x.id === id)).toMatchObject({ placeholder: true, version: "0" });
     }
   });
 
@@ -141,5 +157,128 @@ describe("@korra/packs", () => {
     expect(md).toContain("2026-11-30");
     expect(md).not.toMatch(/\{(bank|month|dueDate)\}/);
     expect(md.toLowerCase()).toContain("unverified");
+  });
+
+  describe("hdfc layout (HDFC request letter)", () => {
+    const hdfcPack = (n: number) =>
+      asReadyPackForTest(
+        Array.from({ length: n }, (_, i) => row(i + 1, { contractRef: i === 0 ? "MSA-1" : null })),
+        "HDFC Bank",
+      );
+
+    it("follows HDFC's 2B column order and is not a placeholder", () => {
+      const l = getLayout("hdfc");
+      expect(l).toMatchObject({ id: "hdfc", version: "1", placeholder: false, pdfStyle: "hdfc-letter" });
+      expect(l.columns.map((c) => c.header)).toEqual([
+        "Sr no.",
+        "Service Recipient Name & Address",
+        "Country",
+        "Invoice No.",
+        "Invoice Date",
+        "Currency",
+        "Amount",
+        "Net Realisable Value",
+        "Contract number if any",
+        "Description of Services",
+        "SAC Code",
+        "Remarks",
+      ]);
+      expect(l.columns.map((c) => c.key)).toEqual([
+        "serialNo",
+        "clientNameAndAddress",
+        "clientCountry",
+        "invoiceNo",
+        "invoiceDate",
+        "invoiceAmount.currency",
+        "invoiceAmount",
+        "netRealisableValue",
+        "contractRef",
+        "serviceDescription",
+        "sacCode",
+        "remarks",
+      ]);
+    });
+
+    it("other banks keep the table PDF style", () => {
+      for (const id of ["generic", "icici", "axis"]) expect(getLayout(id).pdfStyle).toBe("table");
+    });
+
+    it("xlsx has serial numbers, one recipient name-and-address cell and an empty remarks cell", async () => {
+      const r = await renderPack(hdfcPack(3), "hdfc", []);
+      const wb = new ExcelJS.Workbook();
+      await wb.xlsx.load(file(r, ".xlsx").bytes as unknown as ArrayBuffer);
+      const ws = wb.getWorksheet("EDF")!;
+      expect(ws.rowCount).toBe(4);
+      for (const n of [1, 2, 3]) {
+        const xr = ws.getRow(n + 1);
+        expect(xr.getCell(1).value).toBe(n);
+        expect(xr.getCell(2).value).toBe(`Client ${n}\n1 Main St, NYC`);
+        expect(xr.getCell(4).value).toBe(`INV-${n}`);
+        expect(xr.getCell(12).value).toBeNull();
+      }
+      expect(ws.getRow(2).getCell(9).value).toBe("MSA-1");
+      expect(ws.getRow(3).getCell(9).value).toBeNull();
+    });
+
+    it("xlsx is deterministic", async () => {
+      const a = file(await renderPack(hdfcPack(3), "hdfc", []), ".xlsx").bytes;
+      const b = file(await renderPack(hdfcPack(3), "hdfc", []), ".xlsx").bytes;
+      expect(Buffer.from(a).equals(Buffer.from(b))).toBe(true);
+    });
+
+    it("renders the letter as a valid A4 PDF without the unverified banner", async () => {
+      const r = await renderPack(hdfcPack(2), "hdfc", []);
+      const bytes = file(r, ".pdf").bytes;
+      expect(new TextDecoder().decode(bytes.slice(0, 5))).toBe("%PDF-");
+      const doc = await PDFDocument.load(bytes);
+      expect(doc.getPageCount()).toBeGreaterThanOrEqual(1);
+      expect(doc.getPage(0).getSize().width).toBeCloseTo(595.28, 1);
+      expect(await pdfDraws(bytes, "Request letter for Export of Services")).toBe(true);
+      expect(await pdfDraws(bytes, "OFAC Declaration:")).toBe(true);
+      expect(await pdfDraws(bytes, "AUTHORISED SIGNATORY")).toBe(true);
+      expect(await pdfDraws(bytes, "Layout follows HDFC Bank")).toBe(true);
+      expect(await pdfDraws(bytes, "not yet verified")).toBe(false);
+      // FEMA undertaking says "services", not the form's leftover "goods".
+      expect(await pdfDraws(bytes, "above mentioned services under the extant")).toBe(true);
+      expect(await pdfDraws(bytes, "See annexure")).toBe(false);
+    });
+
+    it("moves more than 4 invoices to an annexure page", async () => {
+      const few = await PDFDocument.load(file(await renderPack(hdfcPack(4), "hdfc", []), ".pdf").bytes);
+      const bytes = file(await renderPack(hdfcPack(5), "hdfc", []), ".pdf").bytes;
+      const many = await PDFDocument.load(bytes);
+      expect(many.getPageCount()).toBeGreaterThanOrEqual(2);
+      expect(many.getPageCount()).toBeGreaterThan(few.getPageCount());
+      expect(await pdfDraws(bytes, "See annexure")).toBe(true);
+      expect(await pdfDraws(bytes, "details of invoices")).toBe(true);
+      const big = await PDFDocument.load(file(await renderPack(hdfcPack(60), "hdfc", []), ".pdf").bytes);
+      expect(big.getPageCount()).toBeGreaterThan(many.getPageCount());
+    });
+
+    it("lists the country of final destination only when every row shares it", async () => {
+      const same = file(await renderPack(hdfcPack(2), "hdfc", []), ".pdf").bytes;
+      expect(await pdfDraws(same, "Country of Final Destination:")).toBe(true);
+      expect(await pdfDraws(same, "As per table")).toBe(false);
+      const mixed = asReadyPackForTest([row(1), row(2, { clientCountry: "GB" })], "HDFC Bank");
+      expect(await pdfDraws(file(await renderPack(mixed, "hdfc", []), ".pdf").bytes, "As per table")).toBe(true);
+    });
+
+    it("guide drops the unverified note and the portal claim", async () => {
+      const md = new TextDecoder().decode(file(await renderPack(hdfcPack(1), "hdfc", []), ".md").bytes);
+      expect(md.toLowerCase()).not.toContain("unverified");
+      expect(md.toLowerCase()).not.toContain("portal");
+      expect(md).toContain("Trade Desk");
+      expect(md).toContain("2026-11-30");
+      expect(md).not.toMatch(/\{(bank|month|dueDate)\}/);
+    });
+  });
+
+  it("other banks keep the placeholder banner in the PDF", async () => {
+    for (const id of ["icici", "axis"]) {
+      const bytes = file(await renderPack(asReadyPackForTest([row(1)]), id, []), ".pdf").bytes;
+      expect(await pdfDraws(bytes, "not yet verified")).toBe(true);
+    }
+    const generic = file(await renderPack(asReadyPackForTest([row(1)]), "generic", []), ".pdf").bytes;
+    expect(await pdfDraws(generic, "not yet verified")).toBe(false);
   });
 });

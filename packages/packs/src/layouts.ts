@@ -1,7 +1,7 @@
 import { z } from "zod";
 import generic1 from "../layouts/generic@1.json";
 import icici0 from "../layouts/icici@0.json";
-import hdfc0 from "../layouts/hdfc@0.json";
+import hdfc1 from "../layouts/hdfc@1.json";
 import axis0 from "../layouts/axis@0.json";
 import declGeneric1 from "../layouts/declaration-generic@1.json";
 import declIcici0 from "../layouts/declaration-icici@0.json";
@@ -27,6 +27,12 @@ export const COLUMN_KEYS = [
   "contractRef",
   "serviceDescription",
   "sacCode",
+  /** 1-based row number (not part of EdfRow). */
+  "serialNo",
+  /** Recipient name and address in one cell. */
+  "clientNameAndAddress",
+  /** Free-text remarks: EdfRow has no data for it, so it renders empty. */
+  "remarks",
 ] as const;
 export type ColumnKey = (typeof COLUMN_KEYS)[number];
 
@@ -57,10 +63,14 @@ const common = {
   guide: z.string().min(1),
 };
 
+export const PDF_STYLES = ["table", "hdfc-letter"] as const;
+
 /** `kind` defaults to "edf" so the original EDF layout files stay valid unchanged. */
 export const edfLayoutSchema = z.object({
   ...common,
   kind: z.literal("edf").default("edf"),
+  /** How the PDF is drawn: the generic table, or a bank's own request-letter structure. */
+  pdfStyle: z.enum(PDF_STYLES).default("table"),
   columns: z.array(z.object({ header: z.string().min(1), key: z.enum(COLUMN_KEYS) })).min(1),
 });
 export const declarationLayoutSchema = z.object({
@@ -85,7 +95,7 @@ export class LayoutNotFoundError extends Error {
 }
 
 // Static imports so the JSON is bundled (no fs at runtime). Add new layout files here.
-const RAW: unknown[] = [generic1, icici0, hdfc0, axis0, declGeneric1, declIcici0, declHdfc0, declAxis0];
+const RAW: unknown[] = [generic1, icici0, hdfc1, axis0, declGeneric1, declIcici0, declHdfc0, declAxis0];
 
 const LAYOUTS: AnyLayout[] = RAW.map((r) => layoutSchema.parse(r));
 

@@ -1,0 +1,58 @@
+{
+  "id": "hdfc",
+  "version": "1",
+  "bankName": "HDFC Bank",
+  "placeholder": false,
+  "pdfStyle": "hdfc-letter",
+  "columns": [
+    {
+      "header": "Sr no.",
+      "key": "serialNo"
+    },
+    {
+      "header": "Service Recipient Name & Address",
+      "key": "clientNameAndAddress"
+    },
+    {
+      "header": "Country",
+      "key": "clientCountry"
+    },
+    {
+      "header": "Invoice No.",
+      "key": "invoiceNo"
+    },
+    {
+      "header": "Invoice Date",
+      "key": "invoiceDate"
+    },
+    {
+      "header": "Currency",
+      "key": "invoiceAmount.currency"
+    },
+    {
+      "header": "Amount",
+      "key": "invoiceAmount"
+    },
+    {
+      "header": "Net Realisable Value",
+      "key": "netRealisableValue"
+    },
+    {
+      "header": "Contract number if any",
+      "key": "contractRef"
+    },
+    {
+      "header": "Description of Services",
+      "key": "serviceDescription"
+    },
+    {
+      "header": "SAC Code",
+      "key": "sacCode"
+    },
+    {
+      "header": "Remarks",
+      "key": "remarks"
+    }
+  ],
+  "guide": "# How to submit your EDF to {bank}\n\nMonth: {month}. Due by: {dueDate} (30 days after month-end).\n\nThis pack follows HDFC Bank's published EDF request letter for service exports.\n\n1. Submit at the Trade Desk of your HDFC Bank branch, or through HDFC's digital channel. Ask your branch which one it wants.\n2. Documents to submit:\n   - the signed EDF request letter (the PDF in this pack),\n   - the annexure sheet (the XLSX in this pack) when you have more than one invoice,\n   - the service invoices and contract (see the supporting zip).\n3. HDFC does not publish its multi-invoice annexure format, so confirm that your branch accepts the XLSX.\n4. Before you submit, fill in the blank fields on the letter (account to credit, purpose code, type and category of export and the other fields left blank) and sign it with your company seal.\n5. Submit by {dueDate}.\n6. Keep the acknowledgement.\n7. Upload the acknowledgement back to Korra and mark the pack as submitted.\n\nPrepared by Korra. Not legal or tax advice. Verify before submission.\n"
+}

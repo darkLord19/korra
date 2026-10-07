@@ -4,7 +4,7 @@ import { createRepos } from "@korra/db";
 import {
   ForbiddenError, NotFoundError, ValidationError,
   acceptCaInvite, confirmUpload, decideAllocation, deleteAccount, editField, generatePack, getMonthState,
-  getCaInvite, getOnboarding, getPackDownloads, getTracker, inviteCa, layoutIdFor, linkNoc, listCaClients, listMyCas,
+  getCaInvite, getOnboarding, getPackDownloads, getTracker, inviteCa, isPlaceholderLayout, layoutIdFor, linkNoc, listCaClients, listMyCas,
   markPackSubmitted, requestUpload, revokeCa, runDailyNotifications, requeueStuckIngests, runIngest, saveProfile, sweepStuckIngests, toWire,
 } from "./index";
 import { caCtx, createTestDeps, createTestOwner, simulateBrowserPut, type TestDeps } from "./testing";
@@ -271,13 +271,17 @@ describe("packs", () => {
     expect(layoutIdFor("State Bank of India")).toBe("generic");
   });
 
-  it("placeholder layouts are flagged; multiple banks get separate blockers", async () => {
+  it("only banks without a verified layout are flagged as placeholders; multiple banks get separate blockers", async () => {
     const o = await createTestOwner(deps);
     await onboard(o.ctx, "HDFC Bank");
     deps.fixtures["inv.pdf"] = invoiceResult();
     await upload(deps, o.ctx, { filename: "inv.pdf", mimeType: "application/pdf", bytes: PDF, month: "2026-09" });
     const res = await generatePack(o.ctx, { month: "2026-09", adBankId: (await getOnboarding(o.ctx)).banks[0]!.id });
-    expect(res).toMatchObject({ ok: true, layoutId: "hdfc", placeholder: true });
+    expect(res).toMatchObject({ ok: true, layoutId: "hdfc", placeholder: false });
+    expect(isPlaceholderLayout("hdfc")).toBe(false);
+    expect(isPlaceholderLayout("icici")).toBe(true);
+    expect(isPlaceholderLayout("axis")).toBe(true);
+    expect(isPlaceholderLayout("generic")).toBe(false);
     const bad = await generatePack(o.ctx, { month: "2026-08", adBankId: (await getOnboarding(o.ctx)).banks[0]!.id });
     expect(bad).toEqual({ ok: false, blockers: [{ kind: "no_invoices" }] });
     await expect(generatePack(o.ctx, { month: "2026-09", adBankId: "nope" })).rejects.toBeInstanceOf(NotFoundError);

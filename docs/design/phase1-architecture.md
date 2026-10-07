@@ -24,7 +24,8 @@ This document is the contract every implementer works from. If code and this doc
 - The CA lead-list dashboard. The query exists; there is no UI.
 
 **Placeholders, called out on purpose**
-- The ICICI, HDFC and Axis column layouts and submission guides are **placeholders** until we collect real formats (PRD open question 1).
+- The ICICI and Axis column layouts and submission guides are **placeholders** until we collect real formats (PRD open question 1).
+- **Resolved for HDFC:** `hdfc@1` follows HDFC Bank's published request letter (`placeholder: false`, `pdfStyle: "hdfc-letter"`). See `docs/research/2026-10-07-hdfc-edf-official-form.md`.
 - The generic layout is the real deliverable.
 - Layouts live in versioned config (§7.4), so filling them in later needs no code change.
 
@@ -405,7 +406,7 @@ export function listLayouts(): { id: string; bankName: string; version: string; 
 
 **Layouts**
 - Each layout is a file in `packages/packs/layouts/{id}@{version}.json`. It holds the column list as `EdfRow` key paths with headers, plus the guide markdown.
-- The available layouts are `generic`, `icici`, `hdfc` and `axis`. ICICI, HDFC and Axis carry `"placeholder": true`, and the UI shows a warning for them.
+- The available layouts are `generic`, `icici`, `hdfc` and `axis`. ICICI and Axis carry `"placeholder": true`, and the UI shows a warning for them. HDFC is `hdfc@1` with `"placeholder": false` and `"pdfStyle": "hdfc-letter"`: its PDF is drawn as HDFC's request letter (`packages/packs/src/pdf-hdfc.ts`), and its XLSX is the multi-invoice annexure. Other layouts default to `"pdfStyle": "table"`. See `docs/research/2026-10-07-hdfc-edf-official-form.md`.
 
 ### 7.5 Ingest job model
 
@@ -550,5 +551,5 @@ APP_URL
 |---|---|---|
 | Q1 | Deel `local_transfer` payouts vs EDPMS closure | **Resolved** in `docs/research/2026-10-06-deel-local-transfer-edpms.md`. The EDF goes to the exporter's own AD bank. For invoices up to ₹10 lakh, the entry closes on the exporter's declaration (Reg. 4(2) proviso, can be filed quarterly in bulk). Above ₹10 lakh, the bank decides (third-party receipt, Reg. 8) or the exporter withdraws by SWIFT. Follow-up feature: a realisation declaration pack. |
 | Q2 | What are the exact Deel transaction export columns? | Columns are matched through an alias table. **A real sample export is needed**, and the parser is updated when we have one. |
-| Q3 | ICICI, HDFC and Axis formats | Placeholder layouts. PRD open question 1. |
+| Q3 | ICICI, HDFC and Axis formats | **HDFC resolved** (`hdfc@1`, see `docs/research/2026-10-07-hdfc-edf-official-form.md`). ICICI and Axis stay placeholder layouts. PRD open question 1. |
 | Q4 | LLM data residency vs PRD §11 | Allowed with a kill switch; zero-retention terms to be sought before public launch. See ADR-0001. |

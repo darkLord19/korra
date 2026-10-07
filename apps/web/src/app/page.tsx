@@ -37,7 +37,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ d
           <li>Track which invoices are realised, and when each one is due (9 months, or 12 for INR).</li>
         </ul>
         <p className="mt-6 max-w-xl text-sm text-muted">
-          Deel is supported first. Other payment sources can be added with a generic CSV. The ICICI, HDFC and Axis layouts are placeholders until we have real bank formats; the generic layout is complete.
+          Deel is supported first. Other payment sources can be added with a generic CSV. The HDFC layout follows HDFC Bank&rsquo;s published request letter, and the generic layout is complete. The ICICI and Axis layouts are placeholders until we have real bank formats.
         </p>
         <div className="mt-8 flex gap-3">
           <Link href="/sign-up" className={buttonClass("primary")}>Create a free account</Link>
