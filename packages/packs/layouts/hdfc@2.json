@@ -1,0 +1,96 @@
+{
+  "id": "hdfc",
+  "version": "2",
+  "bankName": "HDFC Bank",
+  "placeholder": false,
+  "pdfStyle": "hdfc-letter",
+  "columns": [
+    { "header": "Sr no.", "key": "serialNo" },
+    { "header": "Service Recipient Name & Address", "key": "clientNameAndAddress" },
+    { "header": "Country", "key": "clientCountry" },
+    { "header": "Invoice No.", "key": "invoiceNo" },
+    { "header": "Invoice Date", "key": "invoiceDate" },
+    { "header": "Currency", "key": "invoiceAmount.currency" },
+    { "header": "Amount", "key": "invoiceAmount" },
+    { "header": "Net Realisable Value", "key": "netRealisableValue" },
+    { "header": "Contract number if any", "key": "contractRef" },
+    { "header": "Description of Services", "key": "serviceDescription" },
+    { "header": "SAC Code", "key": "sacCode" },
+    { "header": "Remarks", "key": "remarks" }
+  ],
+  "submission": {
+    "documents": [
+      "Signed EDF Request Letter (PDF)",
+      "Multi-invoice Annexure Spreadsheet (XLSX)",
+      "Export Invoices & Service Contracts (ZIP)",
+      "Disposal instructions for credit to account"
+    ],
+    "signing": {
+      "wetSignature": true,
+      "seal": true,
+      "scannedOk": false,
+      "dscOk": false,
+      "note": "Signed as per Bank record with company seal. Submit at Trade Desk or via digital channel."
+    },
+    "channels": [
+      {
+        "kind": "netbanking",
+        "title": "HDFC Bank NetBanking",
+        "steps": [
+          "Log in to HDFC Bank NetBanking.",
+          "Navigate to Trade Services or TradeOnNet (digital channel).",
+          "Upload the signed EDF letter and supporting export invoice pack.",
+          "Confirm the digital submission menu path with your branch as HDFC's public trade documentation does not specify the exact services-EDF upload path."
+        ],
+        "links": [
+          { "label": "HDFC NetBanking Login", "url": "https://netbanking.hdfcbank.com/netbanking/" },
+          { "label": "HDFC Export Trade Services", "url": "https://www.hdfc.bank.in/msme-banking/trade-services/export-trade-services" }
+        ],
+        "verified": false
+      },
+      {
+        "kind": "email",
+        "title": "Email to Branch or Relationship Manager",
+        "steps": [
+          "Open the email draft to your branch or Relationship Manager.",
+          "Attach the downloaded EDF PDF, the invoice XLSX annexure, and the supporting invoices zip.",
+          "Send before {dueDate} and request an acknowledgement email or reference number.",
+          "Save the bank's written acknowledgement and upload it back to Korra."
+        ],
+        "links": [
+          { "label": "HDFC Bank Trade Services", "url": "https://www.hdfc.bank.in/msme-banking/trade-services/other-trade-services/fees-and-charges" }
+        ],
+        "verified": false
+      },
+      {
+        "kind": "branch",
+        "title": "HDFC Bank Branch Trade Desk",
+        "steps": [
+          "Print the signed EDF request letter and attach your company seal.",
+          "Include the multi-invoice XLSX annexure and supporting invoices / contract copies.",
+          "Submit at the Trade Desk of your HDFC Bank branch before 3:00 PM for same-day processing.",
+          "Collect the stamped acknowledgement copy and upload it to Korra."
+        ],
+        "links": [
+          { "label": "HDFC Bank Request Letter Form", "url": "https://www.hdfc.bank.in/content/dam/hdfcbankpws/in/en/msme-banking/trade-service/fees-and-charges/pdfs/exports/edf-request-letter-tf-product.pdf" },
+          { "label": "HDFC Bank FEMA 23(R) Policy", "url": "https://www.hdfc.bank.in/content/dam/hdfcbankpws/in/en/wholesale-banking/export-import-products/Policy-and-Operational-Framework-Export-and-Import-for-Goods-and-Services-under-FEMA-23-R.pdf" }
+        ],
+        "verified": true
+      }
+    ],
+    "email": {
+      "subject": "EDF Submission - {month} - HDFC Bank (AD Code: {adCode})",
+      "intro": "Please find attached our Export Declaration Form (EDF) request letter and supporting export invoice documents for {month} under FEMA 23(R)."
+    },
+    "sources": [
+      {
+        "url": "https://www.hdfc.bank.in/content/dam/hdfcbankpws/in/en/msme-banking/trade-service/fees-and-charges/pdfs/exports/edf-request-letter-tf-product.pdf",
+        "retrievedAt": "2026-10-08"
+      },
+      {
+        "url": "https://www.hdfc.bank.in/content/dam/hdfcbankpws/in/en/wholesale-banking/export-import-products/Policy-and-Operational-Framework-Export-and-Import-for-Goods-and-Services-under-FEMA-23-R.pdf",
+        "retrievedAt": "2026-10-08"
+      }
+    ]
+  }
+}

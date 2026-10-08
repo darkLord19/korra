@@ -7,6 +7,28 @@ export const H = 841.89;
 export const M = 36;
 export const FOOTER = "Prepared by Korra. Not legal or tax advice. Verify before submission.";
 
+export const DECLARATION_4 = [
+  "I /We hereby declare that I/we @am/are the seller/consignor of the goods/ provider of services in respect of which this declaration is made and that the particulars given above are true and that the value to be received from the buyer/third party represents the export value^ contracted and declared above. I/We undertake that I/we have delivered/ will deliver to the authorised dealer named above the foreign exchange / Indian Rupees representing the full value of the goods/services exported as above on or before........................ (i.e. within the period of realisation stipulated by RBI from time to time) in the manner specified in the Regulations made under the Foreign Exchange Management Act, 1999.",
+  "I/We also undertake to submit the documents pertaining to exports declared in this form, to the Authorised Dealer named above, as may be required under the Act.",
+] as const;
+
+export interface SignatureBox {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  pageIndex: number;
+}
+
+export interface PdfStampOptions {
+  signature?: Uint8Array;
+  seal?: Uint8Array;
+  signatory?: {
+    name: string;
+    designation: string;
+  };
+}
+
 /** Standard fonts only encode WinAnsi: map the rupee sign to INR, replace anything else unencodable. */
 export function sanitise(font: PDFFont, s: string): string {
   const supported = new Set(font.getCharacterSet());

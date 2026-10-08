@@ -1,0 +1,97 @@
+{
+  "id": "axis",
+  "version": "1",
+  "bankName": "Axis Bank",
+  "placeholder": true,
+  "pdfStyle": "rbi-annex",
+  "columns": [
+    { "header": "Sr no.", "key": "serialNo" },
+    { "header": "Service Recipient Name & Address", "key": "clientNameAndAddress" },
+    { "header": "Country", "key": "clientCountry" },
+    { "header": "Invoice No.", "key": "invoiceNo" },
+    { "header": "Invoice Date", "key": "invoiceDate" },
+    { "header": "Currency", "key": "invoiceAmount.currency" },
+    { "header": "Amount", "key": "invoiceAmount" },
+    { "header": "Net Realisable Value", "key": "netRealisableValue" },
+    { "header": "Contract number if any", "key": "contractRef" },
+    { "header": "Description of Services", "key": "serviceDescription" },
+    { "header": "SAC Code", "key": "sacCode" },
+    { "header": "Remarks", "key": "remarks" }
+  ],
+  "submission": {
+    "documents": [
+      "Customer Request Letter (Axis Annexure 1)",
+      "Export Declaration Form (Axis Annexure 6 / RBI Annex PDF)",
+      "Invoice Details Spreadsheet (XLSX)",
+      "Service Invoices / Purchase Orders & Contracts (ZIP)"
+    ],
+    "signing": {
+      "wetSignature": true,
+      "seal": true,
+      "scannedOk": true,
+      "dscOk": true,
+      "note": "Signed by authorized official with company stamp. Scanned copy or digitally signed EDF (DSC) accepted per Axis AEXIM policy."
+    },
+    "channels": [
+      {
+        "kind": "netbanking",
+        "title": "Axis Bank NEO for Corporates",
+        "steps": [
+          "Log in to Axis Bank NEO for Corporates.",
+          "Navigate to Trade Finance / TF Connect.",
+          "Submit export transaction documents and attach the signed EDF PDF.",
+          "Confirm digital filing workflow with your branch or RM."
+        ],
+        "links": [
+          { "label": "Axis NEO for Corporates Login", "url": "https://nfc.axis.bank.in/pre-login-interim" },
+          { "label": "Axis Bank Official Website", "url": "https://www.axisbank.com" }
+        ],
+        "verified": true
+      },
+      {
+        "kind": "email",
+        "title": "Email to Branch or Relationship Manager",
+        "steps": [
+          "Open the email draft to your Axis Bank branch or Relationship Manager.",
+          "Attach the scanned/signed EDF PDF (or DSC-signed EDF), the XLSX spreadsheet, and invoice copies.",
+          "Send before {dueDate} and request a submission acknowledgement.",
+          "Save the bank's written acknowledgement and upload it back to Korra."
+        ],
+        "links": [
+          { "label": "Axis Bank Export FAQs", "url": "https://www.axis.bank.in/docs/default-source/default-document-library/faqs-for-export.pdf?sfvrsn=e7042434_1" }
+        ],
+        "verified": true
+      },
+      {
+        "kind": "branch",
+        "title": "Axis Bank Branch Trade Desk",
+        "steps": [
+          "Print the signed EDF (Annexure 6) and customer request letter on company letterhead.",
+          "Affix company stamp and authorized signatory signature.",
+          "Submit at the Trade Desk of your Axis Bank branch before {dueDate}.",
+          "Collect the stamped acknowledgement copy and upload it to Korra."
+        ],
+        "links": [
+          { "label": "Axis Bank Annexure 6 EDF Form", "url": "https://www.axis.bank.in/docs/default-source/default-document-library/annexure-6-export-declaration-form.pdf?sfvrsn=167b10f9_1" },
+          { "label": "Axis Bank AEXIM Policy", "url": "https://www.axis.bank.in/docs/default-source/default-document-library/aexim-policy.pdf?sfvrsn=702b4492_2" },
+          { "label": "Axis Bank FEMA Policy Index", "url": "https://www.axis.bank.in/business-banking/solution-for-importers/fema-export-import-policy" }
+        ],
+        "verified": true
+      }
+    ],
+    "email": {
+      "subject": "EDF Submission - {month} - Axis Bank (AD Code: {adCode})",
+      "intro": "Please find attached our Export Declaration Form (EDF) and supporting export invoice documents for {month} under FEMA 23(R)."
+    },
+    "sources": [
+      {
+        "url": "https://www.axis.bank.in/docs/default-source/default-document-library/aexim-policy.pdf?sfvrsn=702b4492_2",
+        "retrievedAt": "2026-10-08"
+      },
+      {
+        "url": "https://www.axis.bank.in/docs/default-source/default-document-library/annexure-6-export-declaration-form.pdf?sfvrsn=167b10f9_1",
+        "retrievedAt": "2026-10-08"
+      }
+    ]
+  }
+}

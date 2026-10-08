@@ -1,0 +1,94 @@
+{
+  "id": "indusind",
+  "version": "0",
+  "bankName": "IndusInd Bank",
+  "placeholder": true,
+  "pdfStyle": "rbi-annex",
+  "columns": [
+    { "header": "Sr no.", "key": "serialNo" },
+    { "header": "Service Recipient Name & Address", "key": "clientNameAndAddress" },
+    { "header": "Country", "key": "clientCountry" },
+    { "header": "Invoice No.", "key": "invoiceNo" },
+    { "header": "Invoice Date", "key": "invoiceDate" },
+    { "header": "Currency", "key": "invoiceAmount.currency" },
+    { "header": "Amount", "key": "invoiceAmount" },
+    { "header": "Net Realisable Value", "key": "netRealisableValue" },
+    { "header": "Contract number if any", "key": "contractRef" },
+    { "header": "Description of Services", "key": "serviceDescription" },
+    { "header": "SAC Code", "key": "sacCode" },
+    { "header": "Remarks", "key": "remarks" }
+  ],
+  "submission": {
+    "documents": [
+      "Export Declaration Form (RBI Annex PDF)",
+      "Invoice Details Spreadsheet (XLSX)",
+      "Export Invoices & Service Contracts (ZIP)"
+    ],
+    "signing": {
+      "wetSignature": true,
+      "seal": true,
+      "scannedOk": null,
+      "dscOk": null,
+      "note": "Signed by authorised signatory with company seal. Confirm digital/scanned submission with your branch."
+    },
+    "channels": [
+      {
+        "kind": "netbanking",
+        "title": "IndusInd Bank IndusDIRECT",
+        "steps": [
+          "Log in to IndusInd Bank IndusDIRECT portal.",
+          "Navigate to Trade & Forex services.",
+          "Submit trade documents or check with your Relationship Manager.",
+          "Confirm the digital services-EDF workflow with your branch as IndusInd does not publish public menu steps."
+        ],
+        "links": [
+          { "label": "IndusDIRECT Corporate Login", "url": "https://indusdirect.indusind.com" },
+          { "label": "IndusInd Bank Official Website", "url": "https://www.indusind.com" }
+        ],
+        "verified": false
+      },
+      {
+        "kind": "email",
+        "title": "Email to Branch or Relationship Manager",
+        "steps": [
+          "Open the email draft to your IndusInd branch or Relationship Manager.",
+          "Attach the downloaded EDF PDF, the invoice XLSX spreadsheet, and invoice copies.",
+          "Send before {dueDate} and request an acknowledgement email or reference number.",
+          "Save the bank's written acknowledgement and upload it back to Korra."
+        ],
+        "links": [
+          { "label": "IndusInd Bank Official Website", "url": "https://www.indusind.com" }
+        ],
+        "verified": false
+      },
+      {
+        "kind": "branch",
+        "title": "IndusInd Bank Branch / Trade Desk",
+        "steps": [
+          "Print the downloaded EDF (RBI Annex) and sign it with company seal.",
+          "Include invoice copies and service agreements.",
+          "Submit at the Trade Desk or branch of IndusInd Bank before {dueDate}.",
+          "Collect the stamped acknowledgement copy and upload it to Korra."
+        ],
+        "links": [
+          { "label": "IndusInd Bank Official Website", "url": "https://www.indusind.com" }
+        ],
+        "verified": false
+      }
+    ],
+    "email": {
+      "subject": "EDF Submission - {month} - IndusInd Bank (AD Code: {adCode})",
+      "intro": "Please find attached our Export Declaration Form (EDF) and supporting export invoice documents for {month} under FEMA 23(R)."
+    },
+    "sources": [
+      {
+        "url": "https://www.indusind.com",
+        "retrievedAt": "2026-10-08"
+      },
+      {
+        "url": "https://indusdirect.indusind.com",
+        "retrievedAt": "2026-10-08"
+      }
+    ]
+  }
+}

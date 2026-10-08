@@ -1,0 +1,88 @@
+{
+  "id": "generic",
+  "version": "2",
+  "bankName": "Generic (other bank)",
+  "placeholder": false,
+  "pdfStyle": "rbi-annex",
+  "columns": [
+    { "header": "Sr no.", "key": "serialNo" },
+    { "header": "Service Recipient Name & Address", "key": "clientNameAndAddress" },
+    { "header": "Country", "key": "clientCountry" },
+    { "header": "Invoice No.", "key": "invoiceNo" },
+    { "header": "Invoice Date", "key": "invoiceDate" },
+    { "header": "Currency", "key": "invoiceAmount.currency" },
+    { "header": "Amount", "key": "invoiceAmount" },
+    { "header": "Net Realisable Value", "key": "netRealisableValue" },
+    { "header": "Contract number if any", "key": "contractRef" },
+    { "header": "Description of Services", "key": "serviceDescription" },
+    { "header": "SAC Code", "key": "sacCode" },
+    { "header": "Remarks", "key": "remarks" }
+  ],
+  "submission": {
+    "documents": [
+      "Export Declaration Form (RBI Annex PDF)",
+      "Invoice Details Spreadsheet (XLSX)",
+      "Export Invoices & Service Contracts (ZIP)"
+    ],
+    "signing": {
+      "wetSignature": true,
+      "seal": true,
+      "scannedOk": null,
+      "dscOk": null,
+      "note": "Signed by authorised signatory with company seal. Confirm signing format with your AD bank branch."
+    },
+    "channels": [
+      {
+        "kind": "netbanking",
+        "title": "{bank} Internet Banking / Trade Portal",
+        "steps": [
+          "Log in to your bank's corporate banking or trade portal.",
+          "Check for trade finance / export regularisation document submission.",
+          "Confirm the digital submission menu path with your branch as submission steps vary by bank."
+        ],
+        "links": [
+          { "label": "RBI FEMA 23(R) Notification", "url": "https://rbi.org.in/Scripts/BS_FemaNotifications.aspx?Id=13277" }
+        ],
+        "verified": false
+      },
+      {
+        "kind": "email",
+        "title": "Email to Branch or Relationship Manager",
+        "steps": [
+          "Open the email draft to your {bank} branch or Relationship Manager.",
+          "Attach the downloaded EDF PDF, the invoice XLSX spreadsheet, and invoice copies.",
+          "Send before {dueDate} and request an acknowledgement email or reference number.",
+          "Save the bank's written acknowledgement and upload it back to Korra."
+        ],
+        "links": [
+          { "label": "RBI FEMA 23(R) Notification", "url": "https://rbi.org.in/Scripts/BS_FemaNotifications.aspx?Id=13277" }
+        ],
+        "verified": false
+      },
+      {
+        "kind": "branch",
+        "title": "{bank} Branch / Trade Desk",
+        "steps": [
+          "Print the downloaded EDF (RBI Annex) and sign it with company seal.",
+          "Include invoice copies and service agreements.",
+          "Submit at the Trade Desk or branch of {bank} before {dueDate}.",
+          "Collect the stamped acknowledgement copy and upload it to Korra."
+        ],
+        "links": [
+          { "label": "RBI FEMA 23(R) Notification", "url": "https://rbi.org.in/Scripts/BS_FemaNotifications.aspx?Id=13277" }
+        ],
+        "verified": false
+      }
+    ],
+    "email": {
+      "subject": "EDF Submission - {month} - {bank} (AD Code: {adCode})",
+      "intro": "Please find attached our Export Declaration Form (EDF) and supporting export invoice documents for {month} under FEMA 23(R)."
+    },
+    "sources": [
+      {
+        "url": "https://rbi.org.in/Scripts/BS_FemaNotifications.aspx?Id=13277",
+        "retrievedAt": "2026-10-08"
+      }
+    ]
+  }
+}

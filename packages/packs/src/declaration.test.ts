@@ -73,7 +73,19 @@ describe("renderDeclaration", () => {
     for (const id of ["icici", "hdfc", "axis"]) {
       expect(d.find((x) => x.id === `declaration-${id}`)).toMatchObject({ placeholder: true, version: "0" });
     }
-    expect(listLayouts().map((x) => x.id).sort()).toEqual(["axis", "generic", "hdfc", "icici"]);
+    expect(listLayouts().map((x) => x.id).sort()).toEqual([
+      "axis",
+      "bob",
+      "generic",
+      "hdfc",
+      "idfc-first",
+      "indusind",
+      "kotak",
+      "pnb",
+      "sbi",
+      "yes",
+      "icici",
+    ].sort());
     expect(listLayouts("edf")).toEqual(listLayouts());
   });
 

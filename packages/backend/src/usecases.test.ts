@@ -404,7 +404,9 @@ describe("packs", () => {
     expect(layoutIdFor("ICICI Bank Ltd")).toBe("icici");
     expect(layoutIdFor("HDFC BANK")).toBe("hdfc");
     expect(layoutIdFor("Axis Bank")).toBe("axis");
-    expect(layoutIdFor("State Bank of India")).toBe("generic");
+    expect(layoutIdFor("State Bank of India")).toBe("sbi");
+    expect(layoutIdFor("Kotak Mahindra Bank")).toBe("kotak");
+    expect(layoutIdFor("Some Rural Bank")).toBe("generic");
   });
 
   it("only banks without a verified layout are flagged as placeholders; multiple banks get separate blockers", async () => {

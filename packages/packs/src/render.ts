@@ -1,14 +1,16 @@
 import type { ReadyPack } from "@korra/core";
 import type { RenderedPack } from "./rendered";
-import { renderGuide } from "./guide";
+import { renderGuide, renderSubmissionMarkdown } from "./guide";
 import { getLayout } from "./layouts";
 import { renderPdf } from "./pdf";
+import type { PdfStampOptions } from "./pdf-util";
 import { bankSlug } from "./util";
 import { renderXlsx } from "./xlsx";
 import { renderZip } from "./zip";
 
 export { listLayouts, LayoutNotFoundError } from "./layouts";
 export { renderDeclaration } from "./declaration";
+export { renderGuide, renderSubmissionMarkdown };
 
 export const PACKAGE = "@korra/packs";
 
@@ -20,11 +22,12 @@ export async function renderPack(
   pack: ReadyPack,
   layoutId: string,
   supportingDocs: { name: string; bytes: Uint8Array }[],
+  options?: PdfStampOptions,
 ): Promise<RenderedPack> {
   const layout = getLayout(layoutId);
   const slug = bankSlug(pack.adBank.name);
   const [pdf, xlsx, zip] = await Promise.all([
-    renderPdf(pack, layout),
+    renderPdf(pack, layout, options),
     renderXlsx(layout, pack.rows),
     renderZip(supportingDocs),
   ]);
@@ -40,7 +43,7 @@ export async function renderPack(
       {
         name: `HOW-TO-SUBMIT-${slug}.md`,
         mimeType: "text/markdown",
-        bytes: enc.encode(renderGuide(layout, pack.adBank.name, pack.month)),
+        bytes: enc.encode(renderSubmissionMarkdown(layout, pack.adBank.name, pack.month, pack.adBank.adCode)),
       },
     ],
   };

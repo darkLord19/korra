@@ -1,8 +1,10 @@
+import fs from "node:fs";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import ExcelJS from "exceljs";
 import JSZip from "jszip";
 import { PDFDocument, PDFRawStream, decodePDFRawStream } from "pdf-lib";
-import { money, type EdfRow, type PackDraft, type ReadyPack } from "@korra/core";
+import { BANK_CATALOG, money, type EdfRow, type PackDraft, type ReadyPack } from "@korra/core";
 import { LayoutNotFoundError, PACKAGE, listLayouts, renderPack } from "./index";
 import { getLayout } from "./layouts";
 
@@ -75,11 +77,23 @@ describe("@korra/packs", () => {
 
   it("lists layouts", () => {
     const l = listLayouts();
-    expect(l.map((x) => x.id).sort()).toEqual(["axis", "generic", "hdfc", "icici"]);
-    expect(l.find((x) => x.id === "generic")).toMatchObject({ placeholder: false, version: "1" });
-    expect(l.find((x) => x.id === "hdfc")).toMatchObject({ placeholder: false, version: "1" });
-    for (const id of ["icici", "axis"]) {
-      expect(l.find((x) => x.id === id)).toMatchObject({ placeholder: true, version: "0" });
+    expect(l.map((x) => x.id).sort()).toEqual([
+      "axis",
+      "bob",
+      "generic",
+      "hdfc",
+      "idfc-first",
+      "indusind",
+      "kotak",
+      "pnb",
+      "sbi",
+      "yes",
+      "icici",
+    ].sort());
+    expect(l.find((x) => x.id === "generic")).toMatchObject({ placeholder: false, version: "2" });
+    expect(l.find((x) => x.id === "hdfc")).toMatchObject({ placeholder: false, version: "2" });
+    for (const id of ["icici", "axis", "sbi", "kotak", "yes", "idfc-first", "indusind", "bob", "pnb"]) {
+      expect(l.find((x) => x.id === id)).toMatchObject({ placeholder: true });
     }
   });
 
@@ -100,11 +114,11 @@ describe("@korra/packs", () => {
   });
 
   it("writes xlsx with headers in layout order and typed values", async () => {
-    const r = await renderPack(asReadyPackForTest([row(1), row(2)]), "generic", []);
+    const r = await renderPack(asReadyPackForTest([row(1), row(2)]), "generic@1", []);
     const wb = new ExcelJS.Workbook();
     await wb.xlsx.load(file(r, ".xlsx").bytes as unknown as ArrayBuffer);
     const ws = wb.getWorksheet("EDF")!;
-    const layout = getLayout("generic");
+    const layout = getLayout("generic@1");
     const headers = (ws.getRow(1).values as unknown[]).slice(1);
     expect(headers).toEqual(layout.columns.map((c) => c.header));
     expect(ws.rowCount).toBe(3);
@@ -120,15 +134,20 @@ describe("@korra/packs", () => {
   });
 
   it("draws a blank AD code line when the code is empty, and never 'undefined'", async () => {
-    for (const layout of ["generic", "icici"]) {
+    for (const layout of ["generic@1", "icici@0"]) {
       const pack = asReadyPackForTest([row(1)]);
       (pack as { adBank: { adCode: string } }).adBank.adCode = "";
       const bytes = file(await renderPack(pack, layout, []), ".pdf").bytes;
       expect(await pdfDraws(bytes, "AD code: ____________")).toBe(true);
       expect(await pdfDraws(bytes, "undefined")).toBe(false);
     }
-    const withCode = file(await renderPack(asReadyPackForTest([row(1)]), "generic", []), ".pdf").bytes;
+    const withCode = file(await renderPack(asReadyPackForTest([row(1)]), "generic@1", []), ".pdf").bytes;
     expect(await pdfDraws(withCode, "AD code: 6390001")).toBe(true);
+    const annexEmpty = asReadyPackForTest([row(1)]);
+    (annexEmpty as { adBank: { adCode: string } }).adBank.adCode = "";
+    const annexBytes = file(await renderPack(annexEmpty, "generic", []), ".pdf").bytes;
+    expect(await pdfDraws(annexBytes, "AD code:")).toBe(true);
+    expect(await pdfDraws(annexBytes, "undefined")).toBe(false);
   });
 
   it("renders A4 pdf that paginates, and survives non-Latin text and rupee sign", async () => {
@@ -168,7 +187,7 @@ describe("@korra/packs", () => {
     expect(md).toContain("October 2026");
     expect(md).toContain("2026-11-30");
     expect(md).not.toMatch(/\{(bank|month|dueDate)\}/);
-    expect(md.toLowerCase()).toContain("unverified");
+    expect(md.toLowerCase()).toContain("branch");
   });
 
   describe("hdfc layout (HDFC request letter)", () => {
@@ -180,7 +199,7 @@ describe("@korra/packs", () => {
 
     it("follows HDFC's 2B column order and is not a placeholder", () => {
       const l = getLayout("hdfc");
-      expect(l).toMatchObject({ id: "hdfc", version: "1", placeholder: false, pdfStyle: "hdfc-letter" });
+      expect(l).toMatchObject({ id: "hdfc", version: "2", placeholder: false, pdfStyle: "hdfc-letter" });
       expect(l.columns.map((c) => c.header)).toEqual([
         "Sr no.",
         "Service Recipient Name & Address",
@@ -211,8 +230,9 @@ describe("@korra/packs", () => {
       ]);
     });
 
-    it("other banks keep the table PDF style", () => {
-      for (const id of ["generic", "icici", "axis"]) expect(getLayout(id).pdfStyle).toBe("table");
+    it("other banks keep the table PDF style for legacy and rbi-annex for current", () => {
+      for (const id of ["generic@1", "icici@0", "axis@0"]) expect(getLayout(id).pdfStyle).toBe("table");
+      for (const id of ["generic", "icici", "axis", "sbi"]) expect(getLayout(id).pdfStyle).toBe("rbi-annex");
     });
 
     it("xlsx has serial numbers, one recipient name-and-address cell and an empty remarks cell", async () => {
@@ -294,12 +314,79 @@ describe("@korra/packs", () => {
     });
   });
 
-  it("other banks keep the placeholder banner in the PDF", async () => {
-    for (const id of ["icici", "axis"]) {
+  it("legacy layouts keep the placeholder banner in the PDF", async () => {
+    for (const id of ["icici@0", "axis@0"]) {
       const bytes = file(await renderPack(asReadyPackForTest([row(1)]), id, []), ".pdf").bytes;
       expect(await pdfDraws(bytes, "not yet verified")).toBe(true);
     }
-    const generic = file(await renderPack(asReadyPackForTest([row(1)]), "generic", []), ".pdf").bytes;
+    const generic = file(await renderPack(asReadyPackForTest([row(1)]), "generic@1", []), ".pdf").bytes;
     expect(await pdfDraws(generic, "not yet verified")).toBe(false);
+  });
+
+  describe("Stage 2: Bank pack data and selection", () => {
+    it("every catalog bank resolves to its own layout", () => {
+      for (const bank of BANK_CATALOG) {
+        const layout = getLayout(bank.key);
+        expect(layout.id).toBe(bank.key);
+        expect(layout.submission).toBeDefined();
+        expect(layout.submission?.channels.length).toBeGreaterThanOrEqual(1);
+        expect(layout.columns.length).toBeGreaterThan(0);
+      }
+    });
+
+    it("every link is https: and its URL appears in the research doc", () => {
+      const researchDoc = fs.readFileSync(
+        path.resolve(__dirname, "../../../docs/research/2026-10-08-bank-edf-channels.md"),
+        "utf8",
+      );
+      for (const l of listLayouts()) {
+        const layout = getLayout(l.id);
+        if (!layout.submission) continue;
+        for (const ch of layout.submission.channels) {
+          for (const link of ch.links) {
+            expect(link.url.startsWith("https://")).toBe(true);
+            if (!researchDoc.includes(link.url)) {
+              throw new Error(`Link not in research doc: ${link.url} (in layout ${layout.id})`);
+            }
+            expect(researchDoc).toContain(link.url);
+          }
+        }
+        for (const src of layout.submission.sources) {
+          expect(src.url.startsWith("https://")).toBe(true);
+          if (!researchDoc.includes(src.url)) {
+            throw new Error(`Source not in research doc: ${src.url} (in layout ${layout.id})`);
+          }
+          expect(researchDoc).toContain(src.url);
+        }
+      }
+    });
+
+    it("the rbi-annex PDF renders 1, 4 and 30 rows", async () => {
+      for (const n of [1, 4, 30]) {
+        const pack = asReadyPackForTest(
+          Array.from({ length: n }, (_, i) => row(i + 1)),
+          "State Bank of India",
+        );
+        const r = await renderPack(pack, "sbi", []);
+        const pdfBytes = file(r, ".pdf").bytes;
+        expect(new TextDecoder().decode(pdfBytes.slice(0, 5))).toBe("%PDF-");
+        const doc = await PDFDocument.load(pdfBytes);
+        expect(doc.getPageCount()).toBeGreaterThanOrEqual(1);
+        if (n === 30) {
+          expect(doc.getPageCount()).toBeGreaterThan(1);
+        }
+        expect(await pdfDraws(pdfBytes, "EXPORT DECLARATION FORM")).toBe(true);
+        expect(await pdfDraws(pdfBytes, "PART 4")).toBe(true);
+      }
+    });
+
+    it("old layout ids still resolve", () => {
+      expect(getLayout("generic@1")).toMatchObject({ id: "generic", version: "1", pdfStyle: "table" });
+      expect(getLayout("hdfc@1")).toMatchObject({ id: "hdfc", version: "1", pdfStyle: "hdfc-letter" });
+      expect(getLayout("icici@0")).toMatchObject({ id: "icici", version: "0", pdfStyle: "table" });
+      expect(getLayout("axis@0")).toMatchObject({ id: "axis", version: "0", pdfStyle: "table" });
+      expect(getLayout("generic")).toMatchObject({ id: "generic", version: "2" });
+      expect(getLayout("hdfc")).toMatchObject({ id: "hdfc", version: "2" });
+    });
   });
 });

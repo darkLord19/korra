@@ -1,4 +1,4 @@
-import { assessPack } from "@korra/core";
+import { assessPack, findCatalogBankInName } from "@korra/core";
 import { newId } from "@korra/db";
 import { listLayouts, renderPack } from "@korra/packs";
 import type { Ctx } from "./deps-types";
@@ -10,11 +10,9 @@ import type { GeneratePackResult, PackDownloadsWire, PackWire } from "./wire-typ
 
 export const DOWNLOAD_TTL_SECONDS = 600;
 
-/** Bank-specific layout when the bank name mentions icici/hdfc/axis, else the generic layout. */
+/** Bank-specific layout selected by catalog key, falling back to generic. */
 export function layoutIdFor(bankName: string): string {
-  const n = bankName.toLowerCase();
-  for (const id of ["icici", "hdfc", "axis"]) if (n.includes(id)) return id;
-  return "generic";
+  return findCatalogBankInName(bankName)?.key ?? "generic";
 }
 
 /** True when the layout is a placeholder (bank format not collected yet): the UI warns before generating. */

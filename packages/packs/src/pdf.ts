@@ -2,7 +2,8 @@ import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf
 import { formatMoney, type EdfRow, type Money, type ReadyPack } from "@korra/core";
 import type { Layout } from "./layouts";
 import { renderHdfcLetter } from "./pdf-hdfc";
-import { H, M, W, drawFooters, fit, sanitise, totalsByCurrency, wrap } from "./pdf-util";
+import { renderRbiAnnex } from "./pdf-annex";
+import { H, M, W, drawFooters, fit, sanitise, totalsByCurrency, wrap, type PdfStampOptions } from "./pdf-util";
 import { monthLabel } from "./util";
 
 // Re-exported for existing importers (declaration.ts).
@@ -37,8 +38,9 @@ function cells(r: EdfRow): string[] {
   ];
 }
 
-export async function renderPdf(pack: ReadyPack, layout: Layout): Promise<Uint8Array> {
-  if (layout.pdfStyle === "hdfc-letter") return renderHdfcLetter(pack, layout);
+export async function renderPdf(pack: ReadyPack, layout: Layout, options?: PdfStampOptions): Promise<Uint8Array> {
+  if (layout.pdfStyle === "hdfc-letter") return renderHdfcLetter(pack, layout, options);
+  if (layout.pdfStyle === "rbi-annex") return renderRbiAnnex(pack, layout, options);
   const doc = await PDFDocument.create();
   doc.setTitle("Export Declaration Form - Services");
   doc.setProducer("Korra");

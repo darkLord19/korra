@@ -1,7 +1,7 @@
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 import { formatMoney, type EdfRow, type Money, type ReadyPack } from "@korra/core";
 import type { ColumnKey, Layout } from "./layouts";
-import { H, M, W, drawFooters, fit, sanitise, totalsByCurrency, wrap } from "./pdf-util";
+import { H, M, W, drawFooters, fit, sanitise, totalsByCurrency, wrap, DECLARATION_4, type PdfStampOptions } from "./pdf-util";
 import { monthLabel } from "./util";
 
 /**
@@ -28,10 +28,6 @@ const OFAC =
 // The published letter says "goods" in the first sentence (a leftover); it says "Services" at its end.
 const FEMA =
   "We are eligible to export the above mentioned services under the extant Foreign Trade policy. I / We hereby declare that the above transaction does not involve, and is not designed for the purpose of any contravention or evasion of the provisions of the FEMA 1999 or of any rule, regulation, notification, direction or order made thereunder. I/ We also hereby agree and undertake to give such information/ documents as will reasonably satisfy you about this transaction in terms of the above declaration. I/ We also undertake that if I/ We refuse to comply with any such requirements or make only unsatisfactory compliance therewith, the bank shall refuse in writing to undertake the transaction and shall if it has reason to believe that any contravention /evasion is contemplated by me /us report the matter to Reserve Bank of India. *I / We further declare that the undersigned has/have the authority to give this declaration and undertaking on behalf of the firm/company.";
-const DECLARATION_4 = [
-  "I /We hereby declare that I/we @am/are the seller/consignor of the goods/ provider of services in respect of which this declaration is made and that the particulars given above are true and that the value to be received from the buyer/third party represents the export value^ contracted and declared above. I/We undertake that I/we have delivered/ will deliver to the authorised dealer named above the foreign exchange / Indian Rupees representing the full value of the goods/services exported as above on or before........................ (i.e. within the period of realisation stipulated by RBI from time to time) in the manner specified in the Regulations made under the Foreign Exchange Management Act, 1999.",
-  "I/We also undertake to submit the documents pertaining to exports declared in this form, to the Authorised Dealer named above, as may be required under the Act.",
-];
 const ELIGIBLE = "We are eligible to export the above mentioned Services under the current Foreign Trade policy in place,";
 const SECTION_5 = "5. Space for use of Specified Authority (Customs/SEZ/AD/STPI):";
 const SECTION_5_TEXT =
@@ -90,7 +86,7 @@ function cellText(r: EdfRow, key: ColumnKey, index: number): string {
 
 const uniq = (xs: string[]) => [...new Set(xs.map((x) => x.trim()).filter(Boolean))];
 
-export async function renderHdfcLetter(pack: ReadyPack, layout: Layout): Promise<Uint8Array> {
+export async function renderHdfcLetter(pack: ReadyPack, layout: Layout, options?: PdfStampOptions): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
   doc.setTitle("Request letter for Export of Services & EDF Filing - HDFC Bank");
   doc.setProducer("Korra");
@@ -315,9 +311,45 @@ export async function renderHdfcLetter(pack: ReadyPack, layout: Layout): Promise
   const s5H = 20 + s5Lines.length * 9.7 + 34;
   ensure(sigH + s5H + 10);
   y -= 30;
+
+  const sigBox = { x: M, y, width: 190, height: 32 };
+  if (options?.signature) {
+    try {
+      const sigImg = await doc.embedPng(options.signature);
+      const dims = sigImg.scaleToFit(sigBox.width, sigBox.height);
+      page.drawImage(sigImg, {
+        x: sigBox.x,
+        y: sigBox.y + (sigBox.height - dims.height) / 2,
+        width: dims.width,
+        height: dims.height,
+      });
+    } catch {
+      // ignore invalid signature image bytes
+    }
+  }
+  if (options?.seal) {
+    try {
+      const sealImg = await doc.embedPng(options.seal);
+      const dims = sealImg.scaleToFit(50, 40);
+      page.drawImage(sealImg, {
+        x: M + 210,
+        y: sigBox.y - 5,
+        width: dims.width,
+        height: dims.height,
+      });
+    } catch {
+      // ignore invalid seal bytes
+    }
+  }
+
   rule(M, M + 190, y, 0.6, INK);
   draw("AUTHORISED SIGNATORY", M, y - 10, 8, bold);
-  draw("(Signature as per Bank record with company seal)", M, y - 20, 7.5);
+  if (options?.signatory?.name) {
+    draw(`${options.signatory.name}${options.signatory.designation ? ` (${options.signatory.designation})` : ""}`, M, y - 20, 7.5, bold);
+    draw("(Signature as per Bank record with company seal)", M, y - 28, 7);
+  } else {
+    draw("(Signature as per Bank record with company seal)", M, y - 20, 7.5);
+  }
   y -= 32;
 
   const boxTop = y;
