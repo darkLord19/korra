@@ -46,7 +46,7 @@ const unused = (name: string) => () => Promise.reject(new Error(`fake api: ${nam
 /** A KorraApi where every method rejects unless overridden. Methods are vi.fn-friendly plain functions. */
 export function fakeApi(over: Partial<KorraApi> = {}, capabilities: Partial<KorraCapabilities> = {}): KorraApi {
   return {
-    capabilities: { caSharing: true, accountDeletion: "server", backup: false, ...capabilities },
+    capabilities: { caSharing: true, accountDeletion: "server", backup: false, signedUrlsExpire: false, ...capabilities },
     getOnboarding: unused("getOnboarding"),
     saveProfile: unused("saveProfile"),
     saveBank: unused("saveBank"),

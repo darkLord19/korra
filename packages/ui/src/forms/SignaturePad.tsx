@@ -126,10 +126,17 @@ export function SignaturePad({ profile, onSaved, regenerateLabel, onRegenerate }
     ctx.lineWidth = 2.5;
   }, [editing, mode]);
 
-  const onPointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
+  const onPointerDown = (e: React.PointerEvent<HTMLCanvasElement> | React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    canvas.setPointerCapture(e.pointerId);
+    const pointerId = (e as unknown as { pointerId?: number }).pointerId;
+    if (pointerId !== undefined) {
+      try {
+        canvas.setPointerCapture(pointerId);
+      } catch {
+        // Synthetic or uncaptured pointer in headless / automated environments
+      }
+    }
     isDrawingRef.current = true;
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
@@ -145,7 +152,7 @@ export function SignaturePad({ profile, onSaved, regenerateLabel, onRegenerate }
     setHasDrawn(true);
   };
 
-  const onPointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
+  const onPointerMove = (e: React.PointerEvent<HTMLCanvasElement> | React.MouseEvent<HTMLCanvasElement>) => {
     if (!isDrawingRef.current || !lastPosRef.current) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -360,6 +367,9 @@ export function SignaturePad({ profile, onSaved, regenerateLabel, onRegenerate }
                 onPointerMove={onPointerMove}
                 onPointerUp={onPointerUp}
                 onPointerLeave={onPointerUp}
+                onMouseDown={onPointerDown}
+                onMouseMove={onPointerMove}
+                onMouseUp={onPointerUp}
                 className="h-36 w-full touch-none cursor-crosshair bg-surface"
               />
               {!hasDrawn && (

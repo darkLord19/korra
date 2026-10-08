@@ -60,7 +60,7 @@ export function createLocalApi({ ctx, blobs, ingest, onPackGenerated, resumeEver
   };
 
   const api: KorraApi = {
-    capabilities: { caSharing: false, accountDeletion: "local", backup: true },
+    capabilities: { caSharing: false, accountDeletion: "local", backup: true, signedUrlsExpire: false },
 
     getOnboarding: () => call(() => getOnboarding(ctx)),
     saveProfile: (input) => call(() => saveProfile(ctx, input)),

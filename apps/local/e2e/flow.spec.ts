@@ -11,7 +11,7 @@ test("client-only flow: onboarding to EDF pack and tracker, with nothing leaving
   const origin = new URL(baseURL!).origin;
   const seen = await watchPrivacy(page, context);
 
-  await completeOnboarding(page);
+  await completeOnboarding(page, { bankLabel: "State Bank of India", contactEmail: "rm.trade@sbi.co.in" });
 
   // In EDF-mode month: Payments, Main nav, and banners are hidden.
   await page.goto(`/month?m=${MONTH}`);
@@ -22,6 +22,53 @@ test("client-only flow: onboarding to EDF pack and tracker, with nothing leaving
 
   // Generate EDF pack in EDF mode.
   await generateEdfPack(page, origin);
+
+  // Assert SBI layout was picked (not generic): check filenames and placeholder notice
+  await expect(page.getByText("EDF-state-bank-of-india-2026-09.pdf")).toBeVisible();
+  await expect(page.getByText("We couldn't find State Bank of India's own EDF form, so this uses the RBI format. Ask your branch if it's accepted.")).toBeVisible();
+
+  // Channel tabs: Netbanking, Email, Branch
+  await expect(page.getByRole("tab", { name: "Netbanking" })).toBeVisible();
+  const emailTab = page.getByRole("tab", { name: "Email" });
+  await expect(emailTab).toBeVisible();
+  await emailTab.click();
+
+  // Email draft link has mailto: with saved address and required params
+  const draftLink = page.getByRole("link", { name: "Open email draft" });
+  await expect(draftLink).toBeVisible();
+  const mailtoHref = await draftLink.getAttribute("href");
+  expect(mailtoHref).toMatch(/^mailto:rm\.trade@sbi\.co\.in\?/);
+  expect(mailtoHref).toContain("EDF%20Submission");
+  expect(mailtoHref).toContain("Jane%20Dev");
+
+  // Step 2 signature: initially not signed
+  await expect(page.getByText("Not signed")).toBeVisible();
+  // Draw signature on canvas
+  const canvas = page.locator("canvas");
+  await expect(canvas).toBeVisible();
+  await canvas.scrollIntoViewIfNeeded();
+  await canvas.hover({ position: { x: 20, y: 20 } });
+  await page.mouse.down();
+  await canvas.hover({ position: { x: 100, y: 50 } });
+  await page.mouse.up();
+  if (!(await page.getByRole("button", { name: "Clear" }).isEnabled())) {
+    await canvas.evaluate((el: HTMLCanvasElement) => {
+      const ctx = el.getContext("2d");
+      if (ctx) {
+        ctx.fillStyle = "#0f172a";
+        ctx.fillRect(20, 20, 60, 20);
+      }
+      el.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, clientX: 25, clientY: 25, pointerId: 1 }));
+      el.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, pointerId: 1 }));
+    });
+  }
+  await expect(page.getByRole("button", { name: "Clear" })).toBeEnabled();
+  await page.getByLabel("Authorised signatory name").fill("Jane Dev");
+  await page.getByLabel("Designation").fill("Director");
+  await page.getByRole("button", { name: "Add signature → regenerate pack" }).click();
+
+  // Wait for regenerated pack
+  await expect(page.getByText("Signed as Jane Dev (Director)")).toBeVisible();
 
   // On the pack page: nudge card is visible.
   await expect(page.getByRole("heading", { name: /Want Korra to keep watching these invoices/ })).toBeVisible();
@@ -40,13 +87,14 @@ test("client-only flow: onboarding to EDF pack and tracker, with nothing leaving
   // In full mode, confirm match and add hand payment.
   await addPaymentsAndMatches(page);
 
-  // Download a pack file.
+  // Download a pack file and verify PDF contains an image XObject (stamped signature).
   await page.goto(`/month?m=${MONTH}`);
-  await page.getByRole("link", { name: /^Pack generated/ }).first().click();
+  await page.getByRole("link", { name: /^Pack generated/ }).last().click();
   const downloads = page.getByRole("link", { name: "Download" });
   const [download] = await Promise.all([page.waitForEvent("download"), downloads.first().click()]);
   const bytes = readFileSync((await download.path())!);
   expect(bytes.byteLength).toBeGreaterThan(500);
+  expect(bytes.toString("latin1")).toContain("/XObject");
 
   // Record the submission with an acknowledgement (stored, not read as an invoice).
   await page.getByTestId("file-input").setInputFiles({ name: "bank-ack.pdf", mimeType: "application/pdf", buffer: await makeInvoicePdf(["Acknowledged by the bank"]) });

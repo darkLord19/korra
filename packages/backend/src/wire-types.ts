@@ -110,11 +110,51 @@ export type GeneratePackResult =
   | { ok: true; packId: string; layoutId: string; placeholder: boolean }
   | { ok: false; blockers: BlockerWire[] };
 
+export interface SubmissionChannelWire {
+  kind: "netbanking" | "email" | "branch";
+  title: string;
+  steps: string[];
+  links: { label: string; url: string }[];
+  verified: boolean;
+}
+
+export interface SubmissionSigningWire {
+  wetSignature: boolean | null;
+  seal: boolean | null;
+  scannedOk: boolean | null;
+  dscOk: boolean | null;
+  note?: string;
+}
+
+export interface SubmissionEmailWire {
+  subject: string;
+  intro: string;
+}
+
+export interface SubmissionWire {
+  documents: string[];
+  signing: SubmissionSigningWire;
+  channels: SubmissionChannelWire[];
+  email?: SubmissionEmailWire;
+  sources: { url: string; retrievedAt: string }[];
+}
+
+export interface PackSummaryWire {
+  invoiceCount: number;
+  totals: MoneyWire[];
+  exporterName: string;
+  signatoryName: string | null;
+}
+
 export interface PackDownloadsWire {
   pack: PackWire;
   placeholder: boolean;
   files: { name: string; mimeType: string; url: string }[];
   signed: boolean;
+  submission: SubmissionWire | null;
+  bank?: AdBankWire | null;
+  summary?: PackSummaryWire;
+  profile?: ExporterProfileWire | null;
 }
 
 export interface TrackerRowWire {

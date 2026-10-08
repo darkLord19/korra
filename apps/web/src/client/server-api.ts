@@ -19,7 +19,7 @@ async function call<T>(result: Promise<ActionResult<T>>): Promise<T> {
  * URL (Supabase Storage; `/api/dev-upload` in the dev in-memory mode), then a confirm action schedules ingest.
  */
 export const serverApi: KorraApi = {
-  capabilities: { caSharing: true, accountDeletion: "server", backup: false },
+  capabilities: { caSharing: true, accountDeletion: "server", backup: false, signedUrlsExpire: true },
 
   getOnboarding: () => call(getOnboardingAction()),
   saveProfile: (input) => call(saveProfileAction(input)),

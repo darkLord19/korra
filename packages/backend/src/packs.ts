@@ -1,14 +1,24 @@
-import { assessPack, findCatalogBankInName } from "@korra/core";
+import { assessPack, edfDueDate, findCatalogBankInName, type Money } from "@korra/core";
 import { newId } from "@korra/db";
-import { listLayouts, renderPack } from "@korra/packs";
+import { getLayout, listLayouts, renderPack } from "@korra/packs";
 import type { Ctx } from "./deps-types";
 import { NotFoundError, ValidationError } from "./errors";
 import { generatePackInput, getPackDownloadsInput, markPackSubmittedInput } from "./inputs";
 import { packWire, parse, repos, requireOwner } from "./internal";
 import { draftFor, loadMonth } from "./month";
-import type { GeneratePackResult, PackDownloadsWire, PackWire } from "./wire-types";
+import type { GeneratePackResult, MoneyWire, PackDownloadsWire, PackSummaryWire, PackWire, SubmissionWire } from "./wire-types";
 
 export const DOWNLOAD_TTL_SECONDS = 600;
+
+const MONTHS = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+
+function monthLabel(month: string): string {
+  const [y, m] = month.split("-");
+  return `${MONTHS[Number(m) - 1] ?? m} ${y}`;
+}
 
 /** Bank-specific layout selected by catalog key, falling back to generic. */
 export function layoutIdFor(bankName: string): string {
@@ -96,12 +106,101 @@ export async function listPacks(ctx: Ctx, month?: string): Promise<PackWire[]> {
 /** Signed download URLs (10 minutes). Works for a CA (read-only). */
 export async function getPackDownloads(ctx: Ctx, rawId: string): Promise<PackDownloadsWire> {
   const packId = parse(getPackDownloadsInput, rawId);
-  const pack = await repos(ctx).packs.get(packId);
+  const r = repos(ctx);
+  const pack = await r.packs.get(packId);
   const files = await Promise.all(
     pack.files.map(async (f) => ({ name: f.name, mimeType: f.mimeType, url: await ctx.deps.blobs.createDownloadUrl(f.blobKey, DOWNLOAD_TTL_SECONDS) })),
   );
   const signed = pack.files.some((f) => (f as { signed?: boolean }).signed === true);
-  return { pack: packWire(pack), placeholder: isPlaceholder(pack.layoutId), files, signed };
+
+  const [banks, profile, invoices] = await Promise.all([
+    r.banks.list(),
+    r.profile.get(),
+    r.invoices.listForMonth(pack.month),
+  ]);
+  const bank = banks.find((b) => b.id === pack.adBankId) ?? null;
+
+  const bankInvoices = invoices.filter(
+    (i) => i.facts.adBankId.value === pack.adBankId || (!i.facts.adBankId.value && profile?.defaultAdBankId === pack.adBankId),
+  );
+  const totalsMap = new Map<string, bigint>();
+  for (const inv of bankInvoices) {
+    const amt = inv.facts.amount.value as Money | null;
+    if (amt) {
+      totalsMap.set(amt.currency, (totalsMap.get(amt.currency) ?? 0n) + amt.minor);
+    }
+  }
+  const totals: MoneyWire[] = [...totalsMap.entries()].map(([currency, minor]) => ({
+    currency,
+    minor: minor.toString(),
+  }));
+
+  const summary: PackSummaryWire = {
+    invoiceCount: bankInvoices.length,
+    totals,
+    exporterName: profile?.legalName ?? "",
+    signatoryName: profile?.signatoryName ?? null,
+  };
+
+  let submission: SubmissionWire | null = null;
+  let layout: ReturnType<typeof getLayout> | null = null;
+  try {
+    layout = getLayout(pack.layoutId);
+  } catch {
+    layout = null;
+  }
+  const sub = layout?.submission;
+  if (sub) {
+    const vars: Record<string, string> = {
+      bank: bank?.name ?? "",
+      month: monthLabel(pack.month),
+      dueDate: edfDueDate(pack.month),
+      adCode: bank?.adCode || "—",
+      branch: bank?.branch || "your branch",
+      contactEmail: bank?.contactEmail || "",
+    };
+    const replaceVars = (s: string) =>
+      s.replace(/\{(bank|month|dueDate|adCode|branch|contactEmail)\}/g, (_, k: string) => vars[k] ?? "");
+
+    submission = {
+      documents: sub.documents.map(replaceVars),
+      signing: {
+        ...sub.signing,
+        note: sub.signing.note ? replaceVars(sub.signing.note) : undefined,
+      },
+      channels: sub.channels.map((ch) => ({
+        ...ch,
+        title: replaceVars(ch.title),
+        steps: ch.steps.map(replaceVars),
+        links: ch.links,
+      })),
+      email: sub.email
+        ? {
+            subject: replaceVars(sub.email.subject),
+            intro: replaceVars(sub.email.intro),
+          }
+        : undefined,
+      sources: sub.sources,
+    };
+  }
+
+  const [signatureUrl, sealUrl] = profile
+    ? await Promise.all([
+        profile.signatureBlobKey ? ctx.deps.blobs.createDownloadUrl(profile.signatureBlobKey, 3600).catch(() => null) : Promise.resolve(null),
+        profile.sealBlobKey ? ctx.deps.blobs.createDownloadUrl(profile.sealBlobKey, 3600).catch(() => null) : Promise.resolve(null),
+      ])
+    : [null, null];
+
+  return {
+    pack: packWire(pack),
+    placeholder: isPlaceholder(pack.layoutId),
+    files,
+    signed,
+    submission,
+    bank,
+    summary,
+    profile: profile ? { ...profile, signatureUrl, sealUrl } : null,
+  };
 }
 
 export async function markPackSubmitted(ctx: Ctx, raw: { packId: string; ackDocumentId?: string }): Promise<PackWire> {

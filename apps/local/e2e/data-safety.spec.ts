@@ -65,7 +65,7 @@ async function snapshot(page: Page, packUrl: string): Promise<Snapshot> {
   await page.goto(packUrl);
   const downloads = page.getByRole("link", { name: "Download" });
   await expect(downloads).toHaveCount(4);
-  await expect(page.getByRole("heading", { name: "How to submit your EDF to Kotak Mahindra Bank" })).toBeVisible(); // the guide, read from the local store
+  await expect(page.getByRole("heading", { name: "3. Submit" })).toBeVisible();
   const pack = await content(main);
   const files: Snapshot["files"] = [];
   for (let i = 0; i < 4; i++) {

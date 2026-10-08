@@ -9,6 +9,8 @@ import { MonthScreen } from "./screens/MonthScreen";
 import { OnboardingScreen } from "./screens/OnboardingScreen";
 import { SettingsScreen } from "./screens/SettingsScreen";
 import { MonthView } from "./month/MonthView";
+import { PackView } from "./pack/PackView";
+import type { PackDownloads } from "./api";
 import { Wrap, fakeApi, invoice, monthState, testNav } from "./test-utils";
 
 const bank = { id: "bank1", name: "Acme Test Bank", adCode: "6390001" };
@@ -673,3 +675,198 @@ describe("SignaturePad", () => {
     expect(clearSignature).toHaveBeenCalled();
   });
 });
+
+describe("ProfileForm bank contact fields", () => {
+  it("renders branch or RM email and branch name inputs and saves them with saveBank", async () => {
+    const saveBank = vi.fn().mockResolvedValue({ id: "bank1", name: "State Bank of India", adCode: "6390001", contactEmail: "rm@sbi.co.in", branch: "Fort, Mumbai" });
+    const saveProfile = vi.fn().mockResolvedValue({
+      legalName: "Jane Dev",
+      address: "123 St",
+      pan: "ABCDE1234F",
+      gstin: "29ABCDE1234F1Z5",
+      iec: null,
+      defaultSacCodes: [],
+      defaultAdBankId: "bank1",
+      signatoryName: null,
+      signatoryDesignation: null,
+      hasSignature: false,
+      hasSeal: false,
+    });
+    const profile = {
+      legalName: "Jane Dev",
+      address: "123 St",
+      pan: "ABCDE1234F",
+      gstin: "29ABCDE1234F1Z5",
+      iec: null,
+      defaultSacCodes: [],
+      defaultAdBankId: "bank1",
+      signatoryName: null,
+      signatoryDesignation: null,
+      hasSignature: false,
+      hasSeal: false,
+    };
+    const sbiBank = { id: "bank1", name: "State Bank of India", adCode: "6390001", contactEmail: null, branch: null };
+
+    render(
+      <Wrap api={fakeApi({ saveBank, saveProfile })}>
+        <ProfileForm profile={profile} banks={[sbiBank]} />
+      </Wrap>,
+    );
+
+    const emailInput = screen.getByLabelText("Branch or RM email (optional)");
+    const branchInput = screen.getByLabelText("Branch name (optional)");
+    expect(emailInput).toBeTruthy();
+    expect(branchInput).toBeTruthy();
+
+    await userEvent.type(emailInput, "rm@sbi.co.in");
+    await userEvent.type(branchInput, "Fort, Mumbai");
+
+    await userEvent.click(screen.getByRole("button", { name: "Save and continue" }));
+
+    await waitFor(() => {
+      expect(saveBank).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: "bank1",
+          name: "State Bank of India",
+          contactEmail: "rm@sbi.co.in",
+          branch: "Fort, Mumbai",
+        }),
+      );
+    });
+  });
+});
+
+describe("PackView checklist and channels", () => {
+  const mockPack = {
+    id: "pack1",
+    month: "2026-09",
+    adBankId: "bank1",
+    layoutId: "sbi@0",
+    generatedAt: "2026-10-01T10:00:00Z",
+    status: "generated" as const,
+    submittedAt: null,
+    files: [{ name: "EDF-sbi-2026-09.pdf", blobKey: "k1", mimeType: "application/pdf" }],
+  };
+
+  const mockDownloads: PackDownloads = {
+    pack: mockPack,
+    placeholder: true,
+    files: [
+      { name: "EDF-sbi-2026-09.pdf", mimeType: "application/pdf", url: "blob:edf" },
+      { name: "EDF-sbi-2026-09.xlsx", mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", url: "blob:xlsx" },
+      { name: "supporting-2026-09.zip", mimeType: "application/zip", url: "blob:zip" },
+      { name: "HOW-TO-SUBMIT-sbi.md", mimeType: "text/markdown", url: "blob:how" },
+    ],
+    signed: true,
+    submission: {
+      documents: ["Signed EDF Request Letter (PDF)", "Multi-invoice Annexure Spreadsheet (XLSX)"],
+      signing: {
+        wetSignature: true,
+        seal: true,
+        scannedOk: false,
+        dscOk: false,
+        note: "Signed as per Bank record with company seal.",
+      },
+      channels: [
+        {
+          kind: "netbanking",
+          title: "SBI Internet Banking (Trade)",
+          steps: ["Log in to SBI Trade.", "Upload the documents."],
+          links: [{ label: "SBI Portal", url: "https://sbi.bank.in" }],
+          verified: false,
+        },
+        {
+          kind: "email",
+          title: "Email to Branch or Relationship Manager",
+          steps: ["Draft the email.", "Send before due date."],
+          links: [],
+          verified: true,
+        },
+        {
+          kind: "branch",
+          title: "SBI Branch Submission",
+          steps: ["Visit the branch in person."],
+          links: [],
+          verified: true,
+        },
+      ],
+      email: {
+        subject: "EDF Submission - September 2026 - State Bank of India (AD Code: 6390001)",
+        intro: "Please find attached our EDF submission under FEMA.",
+      },
+      sources: [{ url: "https://sbi.bank.in", retrievedAt: "2026-10-08" }],
+    },
+    bank: { id: "bank1", name: "State Bank of India", adCode: "6390001", contactEmail: "rm@sbi.co.in", branch: "Fort, Mumbai" },
+    summary: {
+      invoiceCount: 1,
+      totals: [{ minor: "150000", currency: "USD" }],
+      exporterName: "Jane Dev",
+      signatoryName: "Jane Dev",
+    },
+    profile: {
+      legalName: "Jane Dev",
+      address: "123 St",
+      pan: "ABCDE1234F",
+      gstin: "29ABCDE1234F1Z5",
+      iec: null,
+      defaultSacCodes: [],
+      defaultAdBankId: "bank1",
+      signatoryName: "Jane Dev",
+      signatoryDesignation: "Director",
+      signatureBlobKey: "k-sig",
+      sealBlobKey: null,
+    },
+  };
+
+  it("renders 4-step checklist: download files, sign, submit channels, mark as submitted", () => {
+    render(
+      <Wrap api={fakeApi({}, { signedUrlsExpire: false })}>
+        <PackView downloads={mockDownloads} />
+      </Wrap>,
+    );
+
+    expect(screen.getByText("1. Download files")).toBeTruthy();
+    expect(screen.getByText("2. Sign")).toBeTruthy();
+    expect(screen.getByText("3. Submit")).toBeTruthy();
+    expect(screen.getByText("4. Mark as submitted")).toBeTruthy();
+
+    expect(screen.getByText("Official EDF request letter / Annexure (PDF) to submit to your bank.")).toBeTruthy();
+    expect(screen.getByText("Signed as Jane Dev (Director)")).toBeTruthy();
+    expect(screen.getByText("We couldn't find State Bank of India's own EDF form, so this uses the RBI format. Ask your branch if it's accepted.")).toBeTruthy();
+    expect(screen.getByText("Confirm this with your branch.")).toBeTruthy();
+    expect(screen.queryByText(/Download links work for 10 minutes/)).toBeNull();
+  });
+
+  it("shows 10-minute expiry note when signedUrlsExpire is true", () => {
+    render(
+      <Wrap api={fakeApi({}, { signedUrlsExpire: true })}>
+        <PackView downloads={mockDownloads} />
+      </Wrap>,
+    );
+    expect(screen.getByText("Download links work for 10 minutes. Reload this page for fresh ones.")).toBeTruthy();
+  });
+
+  it("switches channel tabs and renders mailto draft on Email tab", async () => {
+    render(
+      <Wrap api={fakeApi()}>
+        <PackView downloads={mockDownloads} />
+      </Wrap>,
+    );
+
+    const emailTab = screen.getByRole("tab", { name: "Email" });
+    await userEvent.click(emailTab);
+
+    expect(screen.getByText("Email to Branch or Relationship Manager")).toBeTruthy();
+    expect(screen.getByText("rm@sbi.co.in")).toBeTruthy();
+
+    const draftBtn = screen.getByRole("link", { name: "Open email draft" });
+    expect(draftBtn).toBeTruthy();
+    const href = draftBtn.getAttribute("href")!;
+    expect(href.startsWith("mailto:rm@sbi.co.in?")).toBe(true);
+    expect(href).toContain("EDF%20Submission");
+    expect(href).toContain("Jane%20Dev");
+    expect(href).toContain("EDF-sbi-2026-09.pdf");
+    expect(screen.getByText("Attach the downloaded files before sending; email links can't attach files.")).toBeTruthy();
+  });
+});
+

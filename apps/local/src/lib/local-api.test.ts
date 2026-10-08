@@ -62,7 +62,7 @@ describe("call (error parity with the web server actions)", () => {
 
 describe("local KorraApi", () => {
   it("declares what the local app can do", async () => {
-    expect((await setup()).api.capabilities).toEqual({ caSharing: false, accountDeletion: "local", backup: true });
+    expect((await setup()).api.capabilities).toEqual({ caSharing: false, accountDeletion: "local", backup: true, signedUrlsExpire: false });
   });
 
   it("rejects an unsupported file type before storing anything", async () => {

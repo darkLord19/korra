@@ -8,7 +8,7 @@ import { bankSlug } from "./util";
 import { renderXlsx } from "./xlsx";
 import { renderZip } from "./zip";
 
-export { listLayouts, LayoutNotFoundError } from "./layouts";
+export { listLayouts, getLayout, LayoutNotFoundError } from "./layouts";
 export { renderDeclaration } from "./declaration";
 export { renderGuide, renderSubmissionMarkdown };
 

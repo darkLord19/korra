@@ -38,6 +38,8 @@ export interface KorraCapabilities {
   accountDeletion: "server" | "local";
   /** The app can back up and restore the user's data to a file. */
   backup: boolean;
+  /** Download links expire (e.g. 10 minutes on a server) or are permanent local URLs. */
+  signedUrlsExpire: boolean;
 }
 
 /** `getPackDownloads` result. `guideText` is the submission guide when the adapter already has it; otherwise the screen fetches the guide file's `url`. */

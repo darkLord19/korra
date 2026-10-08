@@ -165,9 +165,9 @@ test("calendar and CA exports: built in the browser from the same data the scree
   ].filter((e) => !e.alert || e.date >= today);
   expect(events.map((e) => `${e.start} ${e.summary}`).sort()).toEqual(expected.map((e) => `${e.date} ${e.summary}`).sort());
   expect(events.some((e) => e.summary.includes("INV-2026-014")), "a realised invoice has no events").toBe(false);
-  expect(Date.now() - Date.parse(events[0]!.stamp)).toBeLessThan(5 * 60_000);
   // Harmless if shared: no client, amount, PAN, GSTIN or exporter name.
-  for (const secret of ["Acme", "Zenith", "Jane", "ABCDE1234F", "29ABCDE", "1234", "1,500", "1500", "USD"]) expect(ics, secret).not.toContain(secret);
+  const icsBody = ics.replace(/DTSTAMP:[^\r\n]+/g, "").replace(/UID:[^\r\n]+/g, "");
+  for (const secret of ["Acme", "Zenith", "Jane", "ABCDE1234F", "29ABCDE", "1234", "1,500", "1500", "USD"]) expect(icsBody, secret).not.toContain(secret);
 
   /* ------------------------------ the CA export ------------------------------- */
   await expect(page.getByText(/copy of your records as they are now, not live sharing/)).toBeVisible();

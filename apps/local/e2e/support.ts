@@ -48,7 +48,11 @@ export function expectPrivate(seen: Privacy, origin: string): void {
 }
 
 /** First run: "/" shows landing page; click "Prepare my EDF", fill in the profile and pick a bank, land on month. Then a reload shows "Continue your EDF". */
-export async function completeOnboarding(page: Page): Promise<void> {
+export async function completeOnboarding(
+  page: Page,
+  opts: { bankLabel?: string; contactEmail?: string; branch?: string } = {},
+): Promise<void> {
+  const bankLabel = opts.bankLabel ?? "Kotak Mahindra Bank";
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Your export declaration forms, ready for the bank." })).toBeVisible();
   await page.getByRole("link", { name: "Prepare my EDF" }).click();
@@ -58,8 +62,14 @@ export async function completeOnboarding(page: Page): Promise<void> {
   await page.getByLabel("Registered address").fill("12 MG Road, Bengaluru");
   await page.getByLabel("GSTIN").fill("29ABCDE1234F1Z5");
   await expect(page.getByLabel("PAN", { exact: true })).toHaveValue("ABCDE1234F"); // filled in from the GSTIN
-  await page.getByLabel("Which bank receives your foreign payments?").selectOption({ label: "Kotak Mahindra Bank" });
+  await page.getByLabel("Which bank receives your foreign payments?").selectOption({ label: bankLabel });
   await page.getByLabel("AD code").fill("6390001");
+  if (opts.contactEmail) {
+    await page.getByLabel("Branch or RM email (optional)").fill(opts.contactEmail);
+  }
+  if (opts.branch) {
+    await page.getByLabel("Branch name (optional)").fill(opts.branch);
+  }
   await page.getByRole("button", { name: "Save and continue" }).click();
   await expect(page).toHaveURL(/\/month\?m=\d{4}-\d{2}$/);
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();

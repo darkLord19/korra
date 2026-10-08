@@ -43,6 +43,8 @@ export function ProfileForm({ profile, banks, submitLabel = "Save and continue",
   const [bankKey, setBankKey] = useState(current ? (currentEntry?.key ?? OTHER_BANK_KEY) : "");
   const [otherName, setOtherName] = useState(current && !currentEntry ? current.name : "");
   const [adCode, setAdCode] = useState(current?.adCode ?? "");
+  const [contactEmail, setContactEmail] = useState(current?.contactEmail ?? "");
+  const [branch, setBranch] = useState(current?.branch ?? "");
   const [invoice, setInvoice] = useState<InvoiceHandoff | null>(null);
   const made = useRef(new Map<string, string>()); // banks created by this form, in case `banks` has not refreshed yet
   const entry = BANK_CATALOG.find((b) => b.key === bankKey);
@@ -51,8 +53,8 @@ export function ProfileForm({ profile, banks, submitLabel = "Save and continue",
   const hint = entry?.adCodeHint && !adCode.trim() ? `${AD_HINT} ${entry.name}'s own EDF form uses ${entry.adCodeHint}. Confirm with your branch before using it.` : AD_HINT;
 
   // What the form holds now, for `fill` to read after the invoice has been read (the user may have typed meanwhile).
-  const latest = useRef({ legalName, address, gstin, pan, bankKey, adCode });
-  useEffect(() => { latest.current = { legalName, address, gstin, pan, bankKey, adCode }; });
+  const latest = useRef({ legalName, address, gstin, pan, bankKey, adCode, contactEmail, branch });
+  useEffect(() => { latest.current = { legalName, address, gstin, pan, bankKey, adCode, contactEmail, branch }; });
 
   /** Puts a suggestion into the EMPTY fields only, and says which. Nothing is saved. */
   function fill(s: ProfileSuggestionWire, file: File): { tone: "success" | "info" | "warning"; message: string } {
@@ -88,7 +90,13 @@ export function ProfileForm({ profile, banks, submitLabel = "Save and continue",
     start(async () => {
       try {
         const id = made.current.get(norm(bankName)) ?? existing(bankName)?.id;
-        const bank = await api.saveBank({ ...(id && { id }), name: bankName, adCode });
+        const bank = await api.saveBank({
+          ...(id && { id }),
+          name: bankName,
+          adCode,
+          contactEmail: contactEmail.trim() || undefined,
+          branch: branch.trim() || undefined,
+        });
         made.current.set(norm(bankName), bank.id);
         await api.saveProfile({
           legalName: str(fd, "legalName"),
@@ -127,7 +135,16 @@ export function ProfileForm({ profile, banks, submitLabel = "Save and continue",
       <div className="grid gap-4 sm:grid-cols-2 sm:items-start">
         <div className="space-y-4">
           <Field id="bankKey" label="Which bank receives your foreign payments?" hint="New invoices are filed with this bank unless you change it." error={bankKey === OTHER_BANK_KEY ? undefined : fe.name ?? fe.defaultAdBankId}>
-            <Select id="bankKey" value={bankKey} required aria-invalid={!!(fe.name ?? fe.defaultAdBankId)} onChange={(e) => { setBankKey(e.target.value); const k = BANK_CATALOG.find((b) => b.key === e.target.value); if (k) setAdCode(existing(k.name)?.adCode ?? ""); }}>
+            <Select id="bankKey" value={bankKey} required aria-invalid={!!(fe.name ?? fe.defaultAdBankId)} onChange={(e) => {
+              setBankKey(e.target.value);
+              const k = BANK_CATALOG.find((b) => b.key === e.target.value);
+              if (k) {
+                const ex = existing(k.name);
+                setAdCode(ex?.adCode ?? "");
+                setContactEmail(ex?.contactEmail ?? "");
+                setBranch(ex?.branch ?? "");
+              }
+            }}>
               <option value="" disabled>Choose your bank</option>
               {BANK_CATALOG.map((b) => <option key={b.key} value={b.key}>{b.name}</option>)}
               <option value={OTHER_BANK_KEY}>Other bank</option>
@@ -138,6 +155,14 @@ export function ProfileForm({ profile, banks, submitLabel = "Save and continue",
           )}
         </div>
         <Field id="adCode" label="AD code (optional)" hint={hint} error={fe.adCode}><Input id="adCode" value={adCode} onChange={(e) => setAdCode(e.target.value)} aria-invalid={!!fe.adCode} /></Field>
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field id="contactEmail" label="Branch or RM email (optional)" hint="Used to draft submission emails to your bank." error={fe.contactEmail}>
+          <Input id="contactEmail" name="contactEmail" type="email" value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} placeholder="e.g. rm@bank.com" aria-invalid={!!fe.contactEmail} />
+        </Field>
+        <Field id="branch" label="Branch name (optional)" hint="The branch where your account is held." error={fe.branch}>
+          <Input id="branch" name="branch" value={branch} onChange={(e) => setBranch(e.target.value)} placeholder="e.g. Fort, Mumbai" aria-invalid={!!fe.branch} />
+        </Field>
       </div>
       {errors.error && !errors.fieldErrors && <Alert tone="danger">{errors.error}</Alert>}
       <Button type="submit" disabled={pending}>{pending ? "Saving..." : submitLabel}</Button>
