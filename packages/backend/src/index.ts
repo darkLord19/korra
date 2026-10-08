@@ -13,6 +13,7 @@ export { ForbiddenError, NotFoundError, ValidationError, UnauthenticatedError, t
 export { toWire } from "./wire";
 
 export { getOnboarding, saveProfile, saveBank, suggestProfileFromInvoice } from "./onboarding";
+export { saveSignature, clearSignature } from "./signature";
 export { requestUpload, confirmUpload, runIngest, sweepStuckIngests, requeueStuckIngests, listDocuments } from "./uploads";
 export { getMonthState, editField, decideAllocation, linkNoc } from "./review";
 export { generatePack, getPackDownloads, markPackSubmitted, listPacks, layoutIdFor, isPlaceholderLayout } from "./packs";

@@ -3,9 +3,9 @@ import { after } from "next/server";
 import {
   confirmAllFields, confirmUpload, createInvoiceManually, createPaymentManually, decideAllocation, editField, generatePack,
   getMonthState, getOnboarding, getPackDownloads, getTracker, linkNoc, listDocuments, listPacks, markPackSubmitted, requestUpload,
-  runIngest, saveBank, saveProfile,
+  runIngest, saveBank, saveProfile, saveSignature, clearSignature,
   type ConfirmAllFieldsInput, type CreateInvoiceManuallyInput, type CreatePaymentManuallyInput, type DecideAllocationInput, type EditFieldInput,
-  type RequestUploadInput, type SaveBankInput, type SaveProfileInput,
+  type RequestUploadInput, type SaveBankInput, type SaveProfileInput, type SaveSignatureInput,
 } from "@korra/backend";
 import type { PackDownloads } from "@korra/ui";
 import type { ActionResult } from "@/lib/action-result";
@@ -22,6 +22,8 @@ import { packForBrowser } from "./downloads";
 export const getOnboardingAction = async () => run(async () => getOnboarding(await ownerCtx()));
 export const saveProfileAction = async (input: SaveProfileInput) => run(async () => saveProfile(await ownerCtx(), input));
 export const saveBankAction = async (input: SaveBankInput) => run(async () => saveBank(await ownerCtx(), input));
+export const saveSignatureAction = async (input: SaveSignatureInput) => run(async () => saveSignature(await ownerCtx(), input));
+export const clearSignatureAction = async () => run(async () => clearSignature(await ownerCtx()));
 
 export const getMonthStateAction = async (month: string) => run(async () => getMonthState(await ownerCtx(), month));
 export const listDocumentsAction = async (month?: string) => run(async () => listDocuments(await ownerCtx(), month));

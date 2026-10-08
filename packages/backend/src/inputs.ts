@@ -63,6 +63,14 @@ export const saveBankInput = z.object({
 });
 export type SaveBankInput = z.input<typeof saveBankInput>;
 
+export const saveSignatureInput = z.object({
+  signatoryName: z.string().trim().max(100).nullish(),
+  signatoryDesignation: z.string().trim().max(100).nullish(),
+  signatureBase64: z.string().nullish(),
+  sealBase64: z.string().nullish(),
+});
+export type SaveSignatureInput = z.input<typeof saveSignatureInput>;
+
 /* ------------------------------- uploads ------------------------------- */
 
 export const requestUploadInput = z.object({

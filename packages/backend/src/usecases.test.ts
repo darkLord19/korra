@@ -6,7 +6,8 @@ import {
   ForbiddenError, NotFoundError, ValidationError,
   acceptCaInvite, confirmUpload, createInvoiceManually, decideAllocation, deleteAccount, editField, generatePack, getMonthState,
   getCaInvite, getOnboarding, getPackDownloads, getTracker, inviteCa, isPlaceholderLayout, layoutIdFor, linkNoc, listCaClients, listDocuments, listMyCas,
-  markPackSubmitted, requestUpload, revokeCa, runDailyNotifications, requeueStuckIngests, runIngest, saveBank, saveProfile, suggestProfileFromInvoice, sweepStuckIngests, toWire,
+  markPackSubmitted, requestUpload, revokeCa, runDailyNotifications, requeueStuckIngests, runIngest, saveBank, saveProfile,
+  saveSignature, clearSignature, suggestProfileFromInvoice, sweepStuckIngests, toWire,
 } from "./index";
 import { caCtx, createTestDeps, createTestOwner, simulateBrowserPut, type TestDeps } from "./testing";
 import { PDF, deelCsv, firaResult, invoiceResult, f, onboard, upload, usd } from "./helpers.test-util";
@@ -597,5 +598,70 @@ describe("CA sharing", () => {
 
     await revokeCa(owner.ctx, share.id);
     await expect(getPackDownloads(cx, pack.packId)).rejects.toBeInstanceOf(NotFoundError);
+  });
+});
+
+describe("signature and pack signing", () => {
+  const TINY_PNG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+
+  it("saveSignature and clearSignature manage blobs and profile fields", async () => {
+    const o = await createTestOwner(deps);
+    await onboard(o.ctx);
+    const saved = await saveSignature(o.ctx, {
+      signatoryName: "Jane Dev",
+      signatoryDesignation: "Director",
+      signatureBase64: TINY_PNG,
+      sealBase64: TINY_PNG,
+    });
+    expect(saved.signatoryName).toBe("Jane Dev");
+    expect(saved.signatoryDesignation).toBe("Director");
+    expect(saved.signatureBlobKey).toBeTruthy();
+    expect(saved.sealBlobKey).toBeTruthy();
+    expect(saved.signatureUrl).toBeTruthy();
+    expect(saved.sealUrl).toBeTruthy();
+
+    const ob = await getOnboarding(o.ctx);
+    expect(ob.profile?.signatoryName).toBe("Jane Dev");
+    expect(ob.profile?.signatureUrl).toBeTruthy();
+
+    const cleared = await clearSignature(o.ctx);
+    expect(cleared.signatoryName).toBeNull();
+    expect(cleared.signatureBlobKey).toBeNull();
+    expect(cleared.sealBlobKey).toBeNull();
+  });
+
+  it("generatePack stamps signature onto PDF and getPackDownloads marks it signed", async () => {
+    const o = await createTestOwner(deps);
+    const bank = await onboard(o.ctx, "HDFC Bank");
+    deps.fixtures["inv.pdf"] = invoiceResult();
+    await upload(deps, o.ctx, { filename: "inv.pdf", mimeType: "application/pdf", bytes: PDF, month: "2026-09" });
+
+    // Without signature
+    const unsignedRes = await generatePack(o.ctx, { month: "2026-09", adBankId: bank.id });
+    if (!unsignedRes.ok) throw new Error("expected ok");
+    const unsignedDl = await getPackDownloads(o.ctx, unsignedRes.packId);
+    expect(unsignedDl.signed).toBe(false);
+
+    // Save signature
+    await saveSignature(o.ctx, {
+      signatoryName: "Jane Dev",
+      signatoryDesignation: "Director",
+      signatureBase64: TINY_PNG,
+    });
+
+    // Regenerate pack with signature
+    const signedRes = await generatePack(o.ctx, { month: "2026-09", adBankId: bank.id });
+    if (!signedRes.ok) throw new Error("expected ok");
+    const signedDl = await getPackDownloads(o.ctx, signedRes.packId);
+    expect(signedDl.signed).toBe(true);
+
+    // Verify PDF has embedded image
+    const pdfFile = signedDl.files.find((f) => f.name.endsWith(".pdf"))!;
+    const pdfBytes = await deps.blobs.get(signedRes.packId ? `u/${o.id}/packs/${signedRes.packId}/${pdfFile.name}` : "");
+    expect(Buffer.from(pdfBytes).includes("/XObject")).toBe(true);
+
+    // Old pack stays unsigned (immutable)
+    const oldDl = await getPackDownloads(o.ctx, unsignedRes.packId);
+    expect(oldDl.signed).toBe(false);
   });
 });

@@ -8,7 +8,15 @@ import type { AdBankWire, ExporterProfileWire, OnboardingWire, ProfileSuggestion
 export async function getOnboarding(ctx: Ctx): Promise<OnboardingWire> {
   const r = repos(ctx);
   const [profile, banks] = await Promise.all([r.profile.get(), r.banks.list()]);
-  return { profile, banks, complete: profile !== null && banks.some((b) => b.id === profile.defaultAdBankId) };
+  let profileWire: ExporterProfileWire | null = null;
+  if (profile) {
+    const [signatureUrl, sealUrl] = await Promise.all([
+      profile.signatureBlobKey ? ctx.deps.blobs.createDownloadUrl(profile.signatureBlobKey, 3600).catch(() => null) : Promise.resolve(null),
+      profile.sealBlobKey ? ctx.deps.blobs.createDownloadUrl(profile.sealBlobKey, 3600).catch(() => null) : Promise.resolve(null),
+    ]);
+    profileWire = { ...profile, signatureUrl, sealUrl };
+  }
+  return { profile: profileWire, banks, complete: profile !== null && banks.some((b) => b.id === profile.defaultAdBankId) };
 }
 
 export async function saveBank(ctx: Ctx, raw: SaveBankInput): Promise<AdBankWire> {
@@ -32,7 +40,12 @@ export async function saveProfile(ctx: Ctx, raw: SaveProfileInput): Promise<Expo
     signatureBlobKey: input.signatureBlobKey !== undefined ? (input.signatureBlobKey || null) : (existing?.signatureBlobKey ?? null),
     sealBlobKey: input.sealBlobKey !== undefined ? (input.sealBlobKey || null) : (existing?.sealBlobKey ?? null),
   };
-  return r.profile.upsert(profile);
+  const saved = await r.profile.upsert(profile);
+  const [signatureUrl, sealUrl] = await Promise.all([
+    saved.signatureBlobKey ? ctx.deps.blobs.createDownloadUrl(saved.signatureBlobKey, 3600).catch(() => null) : Promise.resolve(null),
+    saved.sealBlobKey ? ctx.deps.blobs.createDownloadUrl(saved.sealBlobKey, 3600).catch(() => null) : Promise.resolve(null),
+  ]);
+  return { ...saved, signatureUrl, sealUrl };
 }
 
 const text = (f: Field<string> | undefined, max: number): string | null => f?.value?.trim().slice(0, max) || null;

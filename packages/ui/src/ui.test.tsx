@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { Stepper } from "./components/Stepper";
 import { KorraApiError } from "./errors";
 import { ProfileForm } from "./forms/ProfileForm";
+import { SignaturePad } from "./forms/SignaturePad";
 import { MonthScreen } from "./screens/MonthScreen";
 import { OnboardingScreen } from "./screens/OnboardingScreen";
 import { SettingsScreen } from "./screens/SettingsScreen";
@@ -615,5 +616,60 @@ describe("edf month page guidance", () => {
     expect(screen.getByText("Ready to generate your pack")).toBeTruthy();
     expect(c2.querySelector("h1 + div > p")!.textContent).toMatch(/^Ready to generate your pack · EDF due /);
     expect(screen.queryByText(/Upload this month.s invoices below/)).toBeNull();
+  });
+});
+
+describe("SignaturePad", () => {
+  it("renders drawing area, signatory fields, notice, and upload fallback when empty", () => {
+    render(
+      <Wrap api={fakeApi()}>
+        <SignaturePad profile={null} />
+      </Wrap>,
+    );
+    expect(screen.getByLabelText("Authorised signatory name")).toBeTruthy();
+    expect(screen.getByLabelText("Designation")).toBeTruthy();
+    expect(screen.getByText("This is an image of your signature, not a DSC. Banks that need a DSC-signed EDF will say so in the steps below.")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Upload an image instead" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Save signature" })).toBeTruthy();
+  });
+
+  it("shows saved state and allows removing signature", async () => {
+    const clearSignature = vi.fn().mockResolvedValue({
+      legalName: "Jane Dev",
+      address: "123 St",
+      pan: "ABCDE1234F",
+      gstin: "29ABCDE1234F1Z5",
+      iec: null,
+      defaultSacCodes: [],
+      defaultAdBankId: "b1",
+      signatoryName: null,
+      signatoryDesignation: null,
+      signatureBlobKey: null,
+      sealBlobKey: null,
+    });
+    const profile = {
+      legalName: "Jane Dev",
+      address: "123 St",
+      pan: "ABCDE1234F",
+      gstin: "29ABCDE1234F1Z5",
+      iec: null,
+      defaultSacCodes: [],
+      defaultAdBankId: "b1",
+      signatoryName: "Jane Dev",
+      signatoryDesignation: "Director",
+      signatureBlobKey: "u/1/profile/sig.png",
+      signatureUrl: "blob:sig",
+      sealBlobKey: null,
+    };
+    render(
+      <Wrap api={fakeApi({ clearSignature })}>
+        <SignaturePad profile={profile} />
+      </Wrap>,
+    );
+    expect(screen.getByText("Signature saved")).toBeTruthy();
+    expect(screen.getByText(/Jane Dev \(Director\)/)).toBeTruthy();
+    const removeBtn = screen.getByRole("button", { name: "Remove" });
+    await userEvent.click(removeBtn);
+    expect(clearSignature).toHaveBeenCalled();
   });
 });

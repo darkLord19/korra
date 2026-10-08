@@ -315,7 +315,7 @@ export async function renderHdfcLetter(pack: ReadyPack, layout: Layout, options?
   const sigBox = { x: M, y, width: 190, height: 32 };
   if (options?.signature) {
     try {
-      const sigImg = await doc.embedPng(options.signature);
+      const sigImg = await (doc.embedPng(options.signature).catch(() => doc.embedJpg(options.signature!)));
       const dims = sigImg.scaleToFit(sigBox.width, sigBox.height);
       page.drawImage(sigImg, {
         x: sigBox.x,
@@ -329,7 +329,7 @@ export async function renderHdfcLetter(pack: ReadyPack, layout: Layout, options?
   }
   if (options?.seal) {
     try {
-      const sealImg = await doc.embedPng(options.seal);
+      const sealImg = await (doc.embedPng(options.seal).catch(() => doc.embedJpg(options.seal!)));
       const dims = sealImg.scaleToFit(50, 40);
       page.drawImage(sealImg, {
         x: M + 210,

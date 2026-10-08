@@ -59,17 +59,27 @@ export async function generatePack(ctx: Ctx, raw: { month: string; adBankId: str
   }
 
   const layoutId = layoutIdFor(bank.name);
-  const rendered = await renderPack(assessed.pack, layoutId, supporting);
+  const signatureBytes = m.profile?.signatureBlobKey ? await ctx.deps.blobs.get(m.profile.signatureBlobKey).catch(() => undefined) : undefined;
+  const sealBytes = m.profile?.sealBlobKey ? await ctx.deps.blobs.get(m.profile.sealBlobKey).catch(() => undefined) : undefined;
+  const signatory = (m.profile?.signatoryName || m.profile?.signatoryDesignation)
+    ? { name: m.profile.signatoryName ?? "", designation: m.profile.signatoryDesignation ?? "" }
+    : undefined;
+  const rendered = await renderPack(assessed.pack, layoutId, supporting, {
+    signature: signatureBytes,
+    seal: sealBytes,
+    signatory,
+  });
 
   const packId = newId();
   const keys: string[] = [];
-  const files = [];
+  const files: { name: string; mimeType: string; blobKey: string; signed?: boolean }[] = [];
   try {
     for (const f of rendered.files) {
       const blobKey = `u/${userId}/packs/${packId}/${f.name}`;
       await ctx.deps.blobs.put(blobKey, f.bytes, f.mimeType);
       keys.push(blobKey);
-      files.push({ name: f.name, mimeType: f.mimeType, blobKey });
+      const isPdf = f.name.endsWith(".pdf");
+      files.push({ name: f.name, mimeType: f.mimeType, blobKey, ...(isPdf && signatureBytes ? { signed: true } : {}) });
     }
     await r.packs.create({ id: packId, month: input.month, adBankId: bank.id, layoutId, files });
   } catch (e) {
@@ -90,7 +100,8 @@ export async function getPackDownloads(ctx: Ctx, rawId: string): Promise<PackDow
   const files = await Promise.all(
     pack.files.map(async (f) => ({ name: f.name, mimeType: f.mimeType, url: await ctx.deps.blobs.createDownloadUrl(f.blobKey, DOWNLOAD_TTL_SECONDS) })),
   );
-  return { pack: packWire(pack), placeholder: isPlaceholder(pack.layoutId), files };
+  const signed = pack.files.some((f) => (f as { signed?: boolean }).signed === true);
+  return { pack: packWire(pack), placeholder: isPlaceholder(pack.layoutId), files, signed };
 }
 
 export async function markPackSubmitted(ctx: Ctx, raw: { packId: string; ackDocumentId?: string }): Promise<PackWire> {

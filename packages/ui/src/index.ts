@@ -27,6 +27,8 @@ export type { PackViewProps } from "./pack/PackView";
 
 export { ProfileForm } from "./forms/ProfileForm";
 export type { InvoiceHandoff } from "./forms/ProfileForm";
+export { SignaturePad, trimCanvas, trimImageFile } from "./forms/SignaturePad";
+export type { SignaturePadProps } from "./forms/SignaturePad";
 
 export { mimeOf, UNSUPPORTED_FILE_MESSAGE } from "./lib/files";
 export { currentMonthIST, dateLabel, daysBetween, monthLabel, money, shiftMonth, FIELD_LABELS } from "./lib/format";

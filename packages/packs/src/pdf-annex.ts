@@ -317,7 +317,7 @@ export async function renderRbiAnnex(
 
   if (options?.signature) {
     try {
-      const sigImg = await doc.embedPng(options.signature);
+      const sigImg = await (doc.embedPng(options.signature).catch(() => doc.embedJpg(options.signature!)));
       const dims = sigImg.scaleToFit(sigBoxW - 8, sigBoxH - 8);
       page.drawImage(sigImg, {
         x: sigBoxX + (sigBoxW - dims.width) / 2,
@@ -343,7 +343,7 @@ export async function renderRbiAnnex(
 
   if (options?.seal) {
     try {
-      const sealImg = await doc.embedPng(options.seal);
+      const sealImg = await (doc.embedPng(options.seal).catch(() => doc.embedJpg(options.seal!)));
       const dims = sealImg.scaleToFit(sealBoxW - 8, sealBoxH - 8);
       page.drawImage(sealImg, {
         x: sealBoxX + (sealBoxW - dims.width) / 2,

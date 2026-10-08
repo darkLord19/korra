@@ -706,7 +706,13 @@ export function createRepos(db: Db, actor: Actor, opts: RepoOptions = {}) {
       return db.transaction(async (tx) => {
         const docs = await tx.select({ k: s.document.blobKey }).from(s.document).where(eq(s.document.userId, uid));
         const ps = await tx.select({ f: s.pack.files }).from(s.pack).where(eq(s.pack.userId, uid));
-        const keys = [...docs.map((d) => d.k), ...ps.flatMap((p) => p.f.map((x) => x.blobKey))];
+        const prof = await tx.select({ sig: s.exporterProfile.signatureBlobKey, seal: s.exporterProfile.sealBlobKey }).from(s.exporterProfile).where(eq(s.exporterProfile.userId, uid));
+        const keys = [
+          ...docs.map((d) => d.k),
+          ...ps.flatMap((p) => p.f.map((x) => x.blobKey)),
+          prof[0]?.sig,
+          prof[0]?.seal,
+        ].filter(Boolean) as string[];
         await tx.delete(s.user).where(eq(s.user.id, uid));
         return [...new Set(keys)];
       });

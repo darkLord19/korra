@@ -5,6 +5,7 @@ import {
   confirmAllFieldsAction, confirmUploadAction, createInvoiceManuallyAction, createPaymentManuallyAction, decideAllocationAction,
   editFieldAction, generatePackAction, getMonthStateAction, getOnboardingAction, getPackDownloadsAction, getTrackerAction,
   linkNocAction, listDocumentsAction, listPacksAction, markPackSubmittedAction, requestUploadAction, saveBankAction, saveProfileAction,
+  saveSignatureAction, clearSignatureAction,
 } from "@/server/actions";
 
 async function call<T>(result: Promise<ActionResult<T>>): Promise<T> {
@@ -23,6 +24,8 @@ export const serverApi: KorraApi = {
   getOnboarding: () => call(getOnboardingAction()),
   saveProfile: (input) => call(saveProfileAction(input)),
   saveBank: (input) => call(saveBankAction(input)),
+  saveSignature: (input) => call(saveSignatureAction(input)),
+  clearSignature: () => call(clearSignatureAction()),
   // A route handler, not a server action: a server action's body is limited to 1 MB and an invoice can be 20 MB.
   async extractProfileFromInvoice(file) {
     const body = new FormData();

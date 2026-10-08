@@ -25,6 +25,7 @@ import type {
   RequestUploadInput,
   SaveBankInput,
   SaveProfileInput,
+  SaveSignatureInput,
   TrackerWire,
 } from "@korra/backend/schemas";
 
@@ -48,6 +49,8 @@ export interface KorraApi {
   getOnboarding(): Promise<OnboardingWire>;
   saveProfile(input: SaveProfileInput): Promise<ExporterProfileWire>;
   saveBank(input: SaveBankInput): Promise<AdBankWire>;
+  saveSignature(input: SaveSignatureInput): Promise<ExporterProfileWire>;
+  clearSignature(): Promise<ExporterProfileWire>;
   /**
    * Reads one of the user's own export invoices (PDF or image) and suggests profile values from its issuer block.
    * Parse only: the file is not stored and nothing is saved. A file that cannot be read gives an all-null suggestion

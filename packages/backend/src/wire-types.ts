@@ -22,7 +22,10 @@ export type AllocationWire = Wire<Allocation>;
 export type RealisationWire = Wire<Realisation>;
 export type BlockerWire = Blocker;
 export type AdBankWire = AdBank;
-export type ExporterProfileWire = ExporterProfile;
+export type ExporterProfileWire = ExporterProfile & {
+  signatureUrl?: string | null;
+  sealUrl?: string | null;
+};
 
 export interface DocumentWire {
   id: string;
@@ -111,6 +114,7 @@ export interface PackDownloadsWire {
   pack: PackWire;
   placeholder: boolean;
   files: { name: string; mimeType: string; url: string }[];
+  signed: boolean;
 }
 
 export interface TrackerRowWire {
