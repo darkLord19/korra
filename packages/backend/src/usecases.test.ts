@@ -57,7 +57,23 @@ describe("onboarding", () => {
     const o = await createTestOwner(deps);
     const bank = await saveBank(o.ctx, { name: "HDFC Bank", adCode: "6390001" });
     const cleared = await saveBank(o.ctx, { id: bank.id, name: "HDFC Bank", adCode: "" });
-    expect(cleared).toEqual({ id: bank.id, name: "HDFC Bank", adCode: "" });
+    expect(cleared).toEqual({ id: bank.id, name: "HDFC Bank", adCode: "", contactEmail: null, branch: null });
+  });
+
+  it("saveBank stores and updates contactEmail and branch", async () => {
+    const o = await createTestOwner(deps);
+    const bank = await saveBank(o.ctx, {
+      name: "HDFC Bank",
+      adCode: "6390001",
+      contactEmail: "trade@hdfcbank.com",
+      branch: "Fort, Mumbai",
+    });
+    expect(bank.contactEmail).toBe("trade@hdfcbank.com");
+    expect(bank.branch).toBe("Fort, Mumbai");
+
+    const updated = await saveBank(o.ctx, { id: bank.id, name: "HDFC Bank", contactEmail: "" });
+    expect(updated.contactEmail).toBeNull();
+    expect(updated.branch).toBe("Fort, Mumbai");
   });
 });
 

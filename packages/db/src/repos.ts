@@ -111,11 +111,29 @@ export function createRepos(db: Db, actor: Actor, opts: RepoOptions = {}) {
         iec: r.iec,
         defaultSacCodes: r.defaultSacCodes,
         defaultAdBankId: r.defaultAdBankId,
+        signatoryName: r.signatoryName,
+        signatoryDesignation: r.signatoryDesignation,
+        signatureBlobKey: r.signatureBlobKey,
+        sealBlobKey: r.sealBlobKey,
       };
     },
     async upsert(p: ExporterProfile): Promise<ExporterProfile> {
       const uid = writeOwner();
-      const values = { ...p, userId: uid, updatedAt: now() };
+      const values = {
+        userId: uid,
+        legalName: p.legalName,
+        address: p.address,
+        pan: p.pan,
+        gstin: p.gstin,
+        iec: p.iec,
+        defaultSacCodes: p.defaultSacCodes,
+        defaultAdBankId: p.defaultAdBankId,
+        signatoryName: p.signatoryName ?? null,
+        signatoryDesignation: p.signatoryDesignation ?? null,
+        signatureBlobKey: p.signatureBlobKey ?? null,
+        sealBlobKey: p.sealBlobKey ?? null,
+        updatedAt: now(),
+      };
       await db.insert(s.exporterProfile).values(values).onConflictDoUpdate({ target: s.exporterProfile.userId, set: values });
       return p;
     },
@@ -126,20 +144,38 @@ export function createRepos(db: Db, actor: Actor, opts: RepoOptions = {}) {
     async list(): Promise<AdBank[]> {
       const uid = await readOwner();
       const rows = await db.select().from(s.adBank).where(eq(s.adBank.userId, uid)).orderBy(asc(s.adBank.createdAt), asc(s.adBank.id));
-      return rows.map((r) => ({ id: r.id, name: r.name, adCode: r.adCode }));
+      return rows.map((r) => ({
+        id: r.id,
+        name: r.name,
+        adCode: r.adCode,
+        contactEmail: r.contactEmail,
+        branch: r.branch,
+      }));
     },
-    async upsert(b: { id?: string; name: string; adCode: string }): Promise<AdBank> {
+    async upsert(b: { id?: string; name: string; adCode: string; contactEmail?: string | null; branch?: string | null }): Promise<AdBank> {
       const uid = writeOwner();
       const id = b.id ?? newId();
+      let contactEmail = b.contactEmail ?? null;
+      let branch = b.branch ?? null;
       if (b.id) {
-        const existing = (await db.select({ userId: s.adBank.userId }).from(s.adBank).where(eq(s.adBank.id, id)))[0];
+        const existing = (await db.select().from(s.adBank).where(eq(s.adBank.id, id)))[0];
         if (existing && existing.userId !== uid) throw new NotFoundError();
+        if (existing) {
+          if (b.contactEmail === undefined) contactEmail = existing.contactEmail;
+          if (b.branch === undefined) branch = existing.branch;
+        }
       }
+      const values = {
+        name: b.name,
+        adCode: b.adCode,
+        contactEmail,
+        branch,
+      };
       await db
         .insert(s.adBank)
-        .values({ id, userId: uid, name: b.name, adCode: b.adCode })
-        .onConflictDoUpdate({ target: s.adBank.id, set: { name: b.name, adCode: b.adCode } });
-      return { id, name: b.name, adCode: b.adCode };
+        .values({ id, userId: uid, ...values })
+        .onConflictDoUpdate({ target: s.adBank.id, set: values });
+      return { id, ...values };
     },
   };
 

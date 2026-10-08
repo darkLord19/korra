@@ -111,6 +111,10 @@ export const exporterProfile = pgTable("exporter_profile", {
   iec: text("iec"),
   defaultSacCodes: jsonb("default_sac_codes").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
   defaultAdBankId: text("default_ad_bank_id").notNull(),
+  signatoryName: text("signatory_name"),
+  signatoryDesignation: text("signatory_designation"),
+  signatureBlobKey: text("signature_blob_key"),
+  sealBlobKey: text("seal_blob_key"),
   updatedAt: ts("updated_at").notNull().defaultNow(),
 });
 
@@ -121,6 +125,8 @@ export const adBank = pgTable(
     userId: ownerId(),
     name: text("name").notNull(),
     adCode: text("ad_code").notNull(),
+    contactEmail: text("contact_email"),
+    branch: text("branch"),
     createdAt: ts("created_at").notNull().defaultNow(),
   },
   (t) => [index("ad_bank_user_idx").on(t.userId)],

@@ -34,6 +34,10 @@ export const saveProfileInput = z.object({
   iec: z.string().trim().toUpperCase().regex(/^[A-Z0-9]{10}$/, "IEC has 10 characters").nullish().transform((v) => v ?? null),
   defaultSacCodes: z.array(z.string().trim().regex(/^\d{4,8}$/, "SAC code is 4 to 8 digits")).default([]),
   defaultAdBankId: id,
+  signatoryName: z.string().trim().max(100).nullish(),
+  signatoryDesignation: z.string().trim().max(100).nullish(),
+  signatureBlobKey: z.string().trim().nullish(),
+  sealBlobKey: z.string().trim().nullish(),
 });
 export type SaveProfileInput = z.input<typeof saveProfileInput>;
 
@@ -47,7 +51,16 @@ export const suggestProfileInput = z.object({
 
 /** Optional: the bank can fill the AD code in on the EDF. "" means not provided. No strict format: a wrong-format rejection is worse than accepting it. */
 const adCodeSchema = z.string().trim().transform((s) => s.toUpperCase().replace(/\s+/g, "")).pipe(z.string().max(20, "AD code is too long")).default("");
-export const saveBankInput = z.object({ id: id.optional(), name: trimmed, adCode: adCodeSchema });
+const contactEmailSchema = z.string().trim().email("Invalid email address").or(z.literal("")).nullish().transform((v) => v || null);
+const branchSchema = z.string().trim().max(120).nullish().transform((v) => v || null);
+
+export const saveBankInput = z.object({
+  id: id.optional(),
+  name: trimmed,
+  adCode: adCodeSchema,
+  contactEmail: contactEmailSchema.optional(),
+  branch: branchSchema.optional(),
+});
 export type SaveBankInput = z.input<typeof saveBankInput>;
 
 /* ------------------------------- uploads ------------------------------- */

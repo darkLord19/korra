@@ -23,7 +23,15 @@ export async function saveProfile(ctx: Ctx, raw: SaveProfileInput): Promise<Expo
   const r = repos(ctx);
   const banks = await r.banks.list();
   if (!banks.some((b) => b.id === input.defaultAdBankId)) throw new NotFoundError("Default AD bank not found");
-  const profile: ExporterProfile = { ...input, iec: input.iec ?? null };
+  const existing = await r.profile.get();
+  const profile: ExporterProfile = {
+    ...input,
+    iec: input.iec ?? null,
+    signatoryName: input.signatoryName !== undefined ? (input.signatoryName || null) : (existing?.signatoryName ?? null),
+    signatoryDesignation: input.signatoryDesignation !== undefined ? (input.signatoryDesignation || null) : (existing?.signatoryDesignation ?? null),
+    signatureBlobKey: input.signatureBlobKey !== undefined ? (input.signatureBlobKey || null) : (existing?.signatureBlobKey ?? null),
+    sealBlobKey: input.sealBlobKey !== undefined ? (input.sealBlobKey || null) : (existing?.sealBlobKey ?? null),
+  };
   return r.profile.upsert(profile);
 }
 

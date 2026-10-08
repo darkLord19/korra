@@ -75,5 +75,17 @@ export const MIGRATIONS: BundledMigration[] = [
       "ALTER TABLE \"ca_share\" ENABLE ROW LEVEL SECURITY;",
       "ALTER TABLE \"notification_log\" ENABLE ROW LEVEL SECURITY;"
     ]
+  },
+  {
+    "tag": "0002_broken_speed",
+    "when": 1791436736434,
+    "statements": [
+      "ALTER TABLE \"ad_bank\" ADD COLUMN \"contact_email\" text;",
+      "ALTER TABLE \"ad_bank\" ADD COLUMN \"branch\" text;",
+      "ALTER TABLE \"exporter_profile\" ADD COLUMN \"signatory_name\" text;",
+      "ALTER TABLE \"exporter_profile\" ADD COLUMN \"signatory_designation\" text;",
+      "ALTER TABLE \"exporter_profile\" ADD COLUMN \"signature_blob_key\" text;",
+      "ALTER TABLE \"exporter_profile\" ADD COLUMN \"seal_blob_key\" text;"
+    ]
   }
 ];

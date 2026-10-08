@@ -89,7 +89,7 @@ V2a was verified and committed: lint, depcruise (both configs), typecheck, build
      - **no requests leave the origin** when metrics are off;
      - the backup round trip;
      - tolerate the one harmless `ErrnoError` on cold boot.
-3. **V3: declarations end to end — DEFERRED (founder decision 2026-10-06: too much for the MVP).** Declarations are only useful once invoices have been declared and realised (first real use ~Jan 2027). The pure `core`/`packs` pieces are committed. A partial, unverified V3a (migration 0002–0004 incl. `pack_invoice` backfill, `inrEquivalent`, use-cases, tests) is parked in `git stash` (`v3a-declarations-wip`); treat it as a starting point, not as verified. Original spec:
+3. **V3: declarations end to end — DEFERRED (founder decision 2026-10-06: too much for the MVP).** Declarations are only useful once invoices have been declared and realised (first real use ~Jan 2027). The pure `core`/`packs` pieces are committed. A partial, unverified V3a (migration 0002–0004 incl. `pack_invoice` backfill, `inrEquivalent`, use-cases, tests) is parked in `git stash` (`v3a-declarations-wip`); treat it as a starting point, not as verified. Note: V3a stash must renumber its migrations to 0003+ and rebase. Original spec:
    - **Migration:**
      - a `pack_invoice` link table, backfilled;
      - `declaration` and `declaration_invoice` tables;

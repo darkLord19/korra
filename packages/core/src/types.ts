@@ -61,6 +61,8 @@ export interface AdBank {
   id: string;
   name: string;
   adCode: string;
+  contactEmail?: string | null;
+  branch?: string | null;
 }
 
 export interface ExporterProfile {
@@ -71,6 +73,10 @@ export interface ExporterProfile {
   iec: string | null;
   defaultSacCodes: string[];
   defaultAdBankId: string;
+  signatoryName?: string | null;
+  signatoryDesignation?: string | null;
+  signatureBlobKey?: string | null;
+  sealBlobKey?: string | null;
 }
 
 /** Reg. 4(2)/6 provisos: a declaration may cover invoices up to INR 10 lakh (minor units: paise). */
