@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
@@ -129,6 +130,25 @@ describe("HomeScreen", () => {
     await userEvent.click(await screen.findByRole("button", { name: "Finish" }));
     await waitFor(() => expect(onSelectTask).toHaveBeenCalledWith("upload:2026-09")); // September is due soonest
     expect(within(screen.getByRole("status")).getByText(/Nice! Next up: Add your September 2026 invoices/)).toBeTruthy();
+  });
+
+  it("keeps a flow on screen when its task leaves the list, until it is done or closed (the backup task disappears the moment the backup is taken)", async () => {
+    const onSelectTask = vi.fn(); // does not change taskId, like a navigation that is still in flight
+    const backup: Task = { id: "backup", kind: "backup", title: "Back up your data", detail: "", urgency: "fyi", icon: "💾" };
+    function Harness() {
+      const [extra, setExtra] = useState<Task[]>([backup]);
+      return <HomeScreen taskId="backup" today={TODAY} extraTasks={extra} onSelectTask={onSelectTask} renderExtraTask={(_t, flow) => (
+        <div><button onClick={() => setExtra([])}>Take backup</button><button onClick={() => flow.onDone()}>Finish</button></div>
+      )} />;
+    }
+    render(<Wrap api={homeApi(complete)}><Harness /></Wrap>);
+    await userEvent.click(await screen.findByRole("button", { name: "Take backup" })); // the task is gone from the list...
+    await waitFor(() => expect(screen.queryByRole("link", { name: /Back up your data/ })).toBeNull());
+    expect(screen.queryByText("That's already done ✓")).toBeNull(); // ...but its flow is still here
+    await userEvent.click(screen.getByRole("button", { name: "Finish" }));
+    await waitFor(() => expect(onSelectTask).toHaveBeenCalled());
+    expect(screen.queryByText("That's already done ✓")).toBeNull();
+    expect(screen.getByRole("button", { name: "Finish" })).toBeTruthy();
   });
 
   it("renders the app's own tasks through renderExtraTask", async () => {

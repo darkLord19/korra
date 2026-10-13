@@ -128,6 +128,10 @@ export function HomeScreen({ taskId, onSelectTask, extraTasks, renderExtraTask, 
   const [data, setData] = useState<HomeData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  // The task whose flow is on screen. A task can drop out of the list while its flow is still showing (a backup that
+  // was just taken, a review whose last card was answered): the flow stays until it calls onDone or onClose, and
+  // "That's already done" is only for a task that was never on screen in this visit.
+  const shown = useRef<Task | null>(null);
   const seq = useRef(0);
 
   const refresh = useCallback(async (): Promise<HomeData | null> => {
@@ -157,7 +161,9 @@ export function HomeScreen({ taskId, onSelectTask, extraTasks, renderExtraTask, 
   const derive = useCallback((d: HomeData) => deriveTasks({ ...d, today }, extraTasks), [today, extraTasks]);
   const tasks = useMemo(() => (data ? derive(data) : null), [data, derive]);
 
-  const selected: Task | null = taskId === null ? null : (tasks ? findTask(tasks, taskId) : null) ?? taskFromId(taskId);
+  const known: Task | null = taskId === null ? null : (tasks ? findTask(tasks, taskId) : null) ?? taskFromId(taskId);
+  const selected: Task | null = known ?? (taskId !== null && shown.current?.id === taskId ? shown.current : null);
+  useEffect(() => { shown.current = selected; });
   const waiting = taskId !== null && selected === null && !tasks && !error;
   const total = tasks ? (tasks.hero ? 1 : 0) + tasks.rest.length : 0;
 
