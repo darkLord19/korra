@@ -20,3 +20,5 @@ apps/web/CLAUDE.md
 # playwright
 test-results/
 playwright-report/
+
+.superpowers/
