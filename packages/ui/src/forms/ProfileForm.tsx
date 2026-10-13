@@ -5,6 +5,7 @@ import type { AdBankWire, ExporterProfileWire, ProfileSuggestionWire } from "@ko
 import { Alert, Button, Field, Input, Select, Textarea } from "../components";
 import { useApi } from "../context";
 import { toFormErrors, type FormErrors } from "../errors";
+import { panForGstinChange, panMismatch as panMismatchFor } from "../lib/profile";
 import { COULDNT_READ, InvoiceFill } from "./InvoiceFill";
 
 const str = (fd: FormData, k: string) => String(fd.get(k) ?? "");
@@ -33,10 +34,10 @@ export function ProfileForm({ profile, banks, submitLabel = "Save and continue",
   const [gstin, setGstin] = useState(p?.gstin ?? "");
   const [pan, setPan] = useState(p?.pan ?? "");
   const [iec, setIec] = useState(p?.iec ?? "");
-  const gstinPan = panFromGstin(gstin);
-  const panMismatch = gstinPan !== null && pan.trim().length === 10 && pan.trim().toUpperCase() !== gstinPan;
+  const gstinPan = panMismatchFor(gstin, pan);
+  const panMismatch = gstinPan !== null;
   // A full GSTIN carries the PAN: fill it in when the PAN is still empty (it stays editable).
-  const changeGstin = (v: string) => { setGstin(v); const fromGstin = panFromGstin(v); if (fromGstin && !pan.trim()) setPan(fromGstin); };
+  const changeGstin = (v: string) => { setGstin(v); setPan(panForGstinChange(v, pan)); };
   // The bank the user picks: a catalog entry, or "Other bank" with a typed name. The bank row behind it is found or created on save.
   const current = banks.find((b) => b.id === p?.defaultAdBankId);
   const currentEntry = current && findCatalogBank(current.name);

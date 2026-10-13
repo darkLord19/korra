@@ -1,14 +1,11 @@
 "use client";
-import { useCallback, useRef, useState, type ChangeEvent, type DragEvent } from "react";
-import { MAX_UPLOAD_BYTES } from "@korra/backend/schemas";
+import { useState } from "react";
 import type { UploadHint } from "../api";
-import { Badge, FileName, Select, cx } from "../components";
+import { Select } from "../components";
 import { useApi } from "../context";
-import { isKorraApiError } from "../errors";
-import { mimeOf } from "../lib/files";
+import { DropZone } from "./DropZone";
 
 type Hint = "" | UploadHint;
-type Item = { key: string; name: string; state: "uploading" | "done" | "error"; message?: string };
 
 /**
  * Hands each picked file to `api.uploadFile` (the adapter owns the transport). Checks type and size first so
@@ -24,35 +21,12 @@ export function UploadPanel({ month, defaultHint = "", compact = false, onUpload
 }) {
   const api = useApi();
   const [hint, setHint] = useState<Hint>(defaultHint);
-  const [items, setItems] = useState<Item[]>([]);
-  const [over, setOver] = useState(false);
-  const input = useRef<HTMLInputElement>(null);
 
-  const patch = (key: string, p: Partial<Item>) => setItems((xs) => xs.map((x) => (x.key === key ? { ...x, ...p } : x)));
-
-  const uploadOne = useCallback(async (file: File, key: string) => {
-    const fail = (message: string) => patch(key, { state: "error", message });
-    if (!mimeOf(file)) return fail("This file type is not supported. Use PDF, PNG, JPG, WebP, CSV or XLSX.");
-    if (file.size > MAX_UPLOAD_BYTES) return fail("Files are limited to 20 MB.");
-    if (file.size === 0) return fail("This file is empty.");
-    try {
-      const { documentId } = await api.uploadFile(file, { month, ...(hint ? { hint } : {}) });
-      patch(key, { state: "done" });
-      onUploaded?.(documentId);
-    } catch (e) {
-      fail(isKorraApiError(e) ? e.message : "The upload failed. Check your connection and try again.");
-    }
-  }, [api, month, hint, onUploaded]);
-
-  function addFiles(files: FileList | File[]) {
-    const list = Array.from(files);
-    const fresh = list.map((f, i) => ({ f, key: `${Date.now()}-${i}-${f.name}` }));
-    setItems((xs) => [...fresh.map(({ f, key }) => ({ key, name: f.name, state: "uploading" as const })), ...xs]);
-    for (const { f, key } of fresh) void uploadOne(f, key);
+  async function upload(file: File) {
+    const { documentId } = await api.uploadFile(file, { month, ...(hint ? { hint } : {}) });
+    onUploaded?.(documentId);
+    return documentId;
   }
-
-  const onDrop = (e: DragEvent) => { e.preventDefault(); setOver(false); addFiles(e.dataTransfer.files); };
-  const onPick = (e: ChangeEvent<HTMLInputElement>) => { if (e.target.files) addFiles(e.target.files); e.target.value = ""; };
 
   return (
     <div className="space-y-3">
@@ -68,36 +42,7 @@ export function UploadPanel({ month, defaultHint = "", compact = false, onUpload
           </Select>
         </div>
       </div>}
-      <div
-        onDragOver={(e) => { e.preventDefault(); setOver(true); }}
-        onDragLeave={() => setOver(false)}
-        onDrop={onDrop}
-        className={cx("rounded-lg border-2 border-dashed px-4 py-8 text-center", over ? "border-accent bg-accent-soft" : "border-line")}
-      >
-        <p className="text-sm">Drop files here, or</p>
-        <button type="button" onClick={() => input.current?.click()} className="mt-2 rounded-md border border-line bg-surface px-4 py-2 text-sm font-medium hover:bg-accent-soft">
-          Choose files
-        </button>
-        <input ref={input} type="file" multiple hidden onChange={onPick} aria-label="Choose files to upload" data-testid="file-input" />
-        <p className="mt-3 text-xs text-muted">PDF, PNG, JPG, WebP, CSV or XLSX. Up to 20 MB each.</p>
-      </div>
-      {items.length > 0 && (
-        <ul className="divide-y divide-line rounded-md border border-line text-sm" aria-live="polite">
-          {items.map((it) => (
-            <li key={it.key} className="flex items-start justify-between gap-3 px-3 py-2">
-              <div className="min-w-0 flex-1">
-                <FileName name={it.name} />
-                {it.message && <p className="mt-0.5 text-xs text-danger">{it.message}</p>}
-              </div>
-              <span className="flex shrink-0 items-center gap-2">
-                {it.state === "uploading" && <Badge>Uploading</Badge>}
-                {it.state === "done" && <Badge tone="ok">Uploaded</Badge>}
-                {it.state === "error" && <Badge tone="danger">Failed</Badge>}
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
+      <DropZone upload={upload} />
     </div>
   );
 }

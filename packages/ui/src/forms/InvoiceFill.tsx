@@ -13,7 +13,11 @@ type Note = { tone: "success" | "info" | "warning"; message: string };
  * (`api.extractProfileFromInvoice`: parse only, nothing stored) and `apply` puts the suggestion into the form
  * and says what it did. Nothing is saved from here.
  */
-export function InvoiceFill({ apply }: { apply: (s: ProfileSuggestionWire, file: File) => Note }) {
+export function InvoiceFill({ apply, big = false }: {
+  apply: (s: ProfileSuggestionWire, file: File) => Note;
+  /** A large, centred drop zone (the first step of setup) instead of the compact strip. */
+  big?: boolean;
+}) {
   const api = useApi();
   const input = useRef<HTMLInputElement>(null);
   const [over, setOver] = useState(false);
@@ -45,13 +49,17 @@ export function InvoiceFill({ apply }: { apply: (s: ProfileSuggestionWire, file:
         onDragOver={(e) => { e.preventDefault(); setOver(true); }}
         onDragLeave={() => setOver(false)}
         onDrop={onDrop}
-        className={cx("flex flex-wrap items-center justify-between gap-3 rounded-lg border-2 border-dashed px-4 py-3 sm:flex-nowrap", over ? "border-accent bg-accent-soft" : "border-line")}
+        className={cx(
+          "border-2 border-dashed",
+          big ? "flex flex-col items-center gap-3 rounded-2xl px-4 py-12 text-center" : "flex flex-wrap items-center justify-between gap-3 rounded-lg px-4 py-3 sm:flex-nowrap",
+          over ? "border-accent bg-accent-soft" : "border-line",
+        )}
       >
         <div className="min-w-0 text-sm">
-          <p className="font-medium">Have an invoice handy? Drop it here to fill this in</p>
-          <p className="text-xs text-muted">A PDF of one of your own export invoices. Only empty fields are filled, and nothing is saved until you press the button below.</p>
+          <p className={big ? "text-lg font-bold" : "font-medium"}>{big ? "Drop one of your invoices here" : "Have an invoice handy? Drop it here to fill this in"}</p>
+          <p className="text-xs text-muted">{big ? "A PDF of one of your own export invoices. Korra reads your details from it. Nothing is saved until you say so." : "A PDF of one of your own export invoices. Only empty fields are filled, and nothing is saved until you press the button below."}</p>
         </div>
-        <button type="button" disabled={reading !== null} onClick={() => input.current?.click()} className="shrink-0 rounded-md border border-line bg-surface px-3 py-1.5 text-sm font-medium hover:bg-accent-soft disabled:opacity-60">
+        <button type="button" disabled={reading !== null} onClick={() => input.current?.click()} className={cx("shrink-0 border border-line bg-surface font-medium hover:bg-accent-soft disabled:opacity-60", big ? "min-h-12 rounded-full px-6 text-base" : "rounded-md px-3 py-1.5 text-sm")}>
           {reading ? "Reading..." : "Choose invoice"}
         </button>
         <input ref={input} type="file" accept={SUGGEST_MIME_TYPES.join(",")} hidden onChange={onPick} aria-label="Choose an invoice to fill this in" data-testid="invoice-fill-input" />
