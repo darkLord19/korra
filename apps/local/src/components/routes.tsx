@@ -28,7 +28,6 @@ export function MonthRoute() {
   const api = useApi();
   const router = useRouter();
   const nav = useNav();
-  const flow = useFlow();
   const raw = useSearchParams().get("m");
   const month = raw !== null && yearMonthSchema.safeParse(raw).success ? raw : null;
   const [ready, setReady] = useState(false);
@@ -57,7 +56,7 @@ export function MonthRoute() {
 
   if (error) return <Alert tone="danger">{error}</Alert>;
   if (month === null || !ready) return <Loading />;
-  return <MonthScreen key={month} month={month} mode={flow === "tracking" ? "full" : "edf"} {...(flow === "tracking" ? {} : { step: <Stepper current={2} /> })} />;
+  return <MonthScreen key={month} month={month} />;
 }
 
 /** `/home`: for now the current month (a stand-in until Home exists). */

@@ -13,6 +13,8 @@ export { Markdown } from "./components/Markdown";
 export { AppShell } from "./shell/AppShell";
 export type { AppShellProps } from "./shell/AppShell";
 
+export { HomeScreen } from "./screens/HomeScreen";
+export { MonthsScreen } from "./screens/MonthsScreen";
 export { MonthScreen } from "./screens/MonthScreen";
 export type { MonthData } from "./screens/MonthScreen";
 export { TrackerScreen } from "./screens/TrackerScreen";
@@ -28,6 +30,13 @@ export { TrackerView } from "./tracker/TrackerView";
 export { PackView } from "./pack/PackView";
 export type { PackViewProps } from "./pack/PackView";
 
+export { TaskFlow } from "./home/TaskFlow";
+export type { TaskFlowProps } from "./home/TaskFlow";
+export { deriveTasks, findTask, taskFromId } from "./home/tasks";
+export type { Task, TaskKind, TaskInput, DoneItem, Urgency } from "./home/tasks";
+export { monthStage, monthNextStep, STAGE_LABEL } from "./home/stage";
+export type { Stage, NextStep } from "./home/stage";
+
 export { FlowFrame } from "./flows/FlowFrame";
 export { SetupFlow } from "./flows/SetupFlow";
 export { UploadFlow } from "./flows/UploadFlow";
@@ -42,5 +51,5 @@ export { SignaturePad, trimCanvas, trimImageFile } from "./forms/SignaturePad";
 export type { SignaturePadProps } from "./forms/SignaturePad";
 
 export { mimeOf, UNSUPPORTED_FILE_MESSAGE } from "./lib/files";
-export { currentMonthIST, dateLabel, daysBetween, monthLabel, money, shiftMonth, FIELD_LABELS } from "./lib/format";
+export { currentMonthIST, todayIST, dateLabel, daysBetween, monthLabel, money, shiftMonth, FIELD_LABELS } from "./lib/format";
 export { majorToMinor, minorToMajor } from "./lib/money-input";

@@ -2,6 +2,8 @@ import { edfDueDate } from "@korra/core";
 import type { BlockerWire, OnboardingWire, MonthStateWire, PackWire, TrackerWire } from "@korra/backend/schemas";
 import { dateLabel, daysBetween, monthLabel } from "../lib/format";
 
+const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
+
 export type TaskKind = "setup" | "upload" | "review" | "generate" | "submit" | "realisation" | "backup";
 export type Urgency = "urgent" | "soon" | "fyi";
 
@@ -73,7 +75,7 @@ function sortTasks(tasks: Task[]): Task[] {
 }
 
 /** Blockers a person fixes by checking an invoice, de-duplicated (every bank repeats them). */
-function reviewBlockers(state: MonthStateWire): BlockerWire[] {
+export function reviewBlockers(state: MonthStateWire): BlockerWire[] {
   const seen = new Map<string, BlockerWire>();
   for (const bank of state.blockersByBank) {
     for (const b of bank.blockers) {
@@ -158,11 +160,14 @@ export function deriveTasks(input: TaskInput, extra: Task[] = []): { hero: Task 
     if (days > REALISATION_WINDOW_DAYS) continue;
     const overdue = days < 0;
     const invoiceNo = row.invoice.invoiceNo.value ?? "Invoice";
+    const invoiceDate = row.invoice.invoiceDate.value;
+    const invoiceMonth = typeof invoiceDate === "string" && MONTH_RE.test(invoiceDate.slice(0, 7)) ? invoiceDate.slice(0, 7) : undefined;
     tasks.push({
       id: `realisation:${row.invoice.id}`, kind: "realisation",
       title: overdue ? `${invoiceNo}: payment overdue` : `${invoiceNo}: payment due ${days === 0 ? "today" : `in ${plural(days, "day", "days")}`}`,
       detail: `${overdue ? "Was due" : "Due"} ${dateLabel(deadline)}`,
       due: deadline, urgency: realisationUrgency(deadline, today), icon: "⏳", invoiceId: row.invoice.id,
+      ...(invoiceMonth ? { month: invoiceMonth } : {}),
     });
   }
 
@@ -181,4 +186,26 @@ export function deriveTasks(input: TaskInput, extra: Task[] = []): { hero: Task 
 
 export function findTask(tasks: { hero: Task | null; rest: Task[] }, id: string): Task | null {
   return [tasks.hero, ...tasks.rest].find((t) => t?.id === id) ?? null;
+}
+
+/**
+ * A task rebuilt from its id alone, for a task that is not in the list (yet): a pack made a moment ago, or an
+ * `upload:`/`review:` link followed from elsewhere. Only the kinds that open a flow of their own can be rebuilt.
+ */
+export function taskFromId(id: string): Task | null {
+  const [kind, first, ...rest] = id.split(":");
+  const base = { detail: "", urgency: "fyi" as Urgency };
+  if (kind === "upload" && first && MONTH_RE.test(first)) {
+    return { ...base, id, kind: "upload", month: first, title: `Add your ${monthLabel(first).split(" ")[0]} invoices`, detail: `EDF due ${dateLabel(edfDueDate(first))}`, due: edfDueDate(first), icon: "📤" };
+  }
+  if (kind === "review" && first && MONTH_RE.test(first)) {
+    return { ...base, id, kind: "review", month: first, title: `A few quick checks on ${monthLabel(first).split(" ")[0]}`, detail: `EDF due ${dateLabel(edfDueDate(first))}`, due: edfDueDate(first), icon: "✏️" };
+  }
+  if (kind === "generate" && first && MONTH_RE.test(first) && rest.length > 0) {
+    return { ...base, id, kind: "generate", month: first, adBankId: rest.join(":"), title: "Make your pack", detail: `EDF due ${dateLabel(edfDueDate(first))}`, due: edfDueDate(first), icon: "📦" };
+  }
+  if (kind === "submit" && first) {
+    return { ...base, id, kind: "submit", packId: [first, ...rest].join(":"), title: "Send your pack", icon: "📮" };
+  }
+  return null;
 }

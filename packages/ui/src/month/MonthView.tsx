@@ -1,15 +1,17 @@
 "use client";
-import type { ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { edfDueDate } from "@korra/core";
 import type { AdBankWire, MonthStateWire, PackWire } from "@korra/backend/schemas";
-import { buttonClass, Card, CardBody, CardHeader, Select } from "../components";
+import { Badge, buttonClass, Button, Sheet } from "../components";
 import { useNav } from "../context";
-import { currentMonthIST, dateLabel, monthLabel, shiftMonth } from "../lib/format";
-import { flaggedCount } from "../lib/fields";
+import { monthNextStep, monthStage, STAGE_LABEL, STAGE_TONE } from "../home/stage";
+import { dateLabel, monthLabel, shiftMonth } from "../lib/format";
 import { DocumentsSection } from "./DocumentsSection";
-import { InvoicesSection } from "./InvoicesSection";
+import { InvoiceCard } from "./InvoiceCard";
+import { InvoiceSheet } from "./InvoiceSheet";
+import { ManualInvoiceForm } from "./ManualEntry";
 import { MatchesSection } from "./MatchesSection";
-import { PacksSection } from "./PacksSection";
+import { MonthLinks } from "./MonthLinks";
 import { PaymentsSection } from "./PaymentsSection";
 import { UploadPanel } from "./UploadPanel";
 
@@ -18,114 +20,150 @@ export interface MonthViewProps {
   state: MonthStateWire;
   banks: AdBankWire[];
   packs: PackWire[];
-  /** Read-only views (a CA's) have no upload panel, editing, match or generate buttons. */
+  /** Read-only views (a CA's) have no add buttons, editing, match buttons or next-step button. */
   readOnly?: boolean;
   /** Called after anything was changed: re-fetch the month. */
   onChanged?: () => void;
   /** Called every few seconds while documents are being read. Defaults to `nav.refresh`. */
   onPoll?: () => void;
-  /** Replaces the text under the Upload heading (apps differ in where files go). */
+  /** Replaces the text above the file drop zone in "Add documents" (apps differ in where files go). */
   uploadDescription?: ReactNode;
-  /** Streamlined first-run EDF flow hides payments, matches, prev/next and the upload hint. */
-  mode?: "full" | "edf";
-  /** Progress shown above the header (the first-run flow passes a stepper). */
-  step?: ReactNode;
 }
 
 const DEFAULT_UPLOAD_DESCRIPTION = "Add this month's invoices, your Deel transactions export, FIRAs and NOCs. Files go straight to secure storage.";
-/** One line on where the month stands (EDF flow): counts of invoices, unread documents, flags and missing fields, then the due date. */
-function EdfStatus({ month, state }: { month: string; state: MonthStateWire }) {
-  const n = state.invoices.length;
-  const reading = state.documents.filter((d) => d.status === "uploaded" || d.status === "ingesting").length;
-  const toConfirm = state.invoices.reduce((sum, inv) => sum + flaggedCount(inv), 0);
-  const missing = state.blockersByBank.reduce((sum, b) => sum + b.blockers.filter((bl) => bl.kind === "missing_field").length, 0);
-  const ready = n > 0 && state.blockersByBank.length > 0 && state.blockersByBank.every((b) => b.blockers.length === 0);
-  const parts = [
-    ready ? <span key="ready" className="font-medium text-ok">Ready to generate your pack</span> : n === 0 ? "No invoices yet" : n === 1 ? "1 invoice" : `${n} invoices`,
-    ...(!ready && reading > 0 ? [`${reading} being read`] : []),
-    ...(!ready && toConfirm > 0 ? [`${toConfirm} to confirm`] : []),
-    ...(!ready && missing > 0 ? [`${missing} missing`] : []),
-    `EDF due ${dateLabel(edfDueDate(month))}`,
-  ];
-  return (
-    <div className="space-y-1">
-      <p className="text-sm text-muted">{parts.map((p, i) => <span key={i}>{i > 0 && " · "}{p}</span>)}</p>
-      {n === 0 && <p className="text-sm">Upload this month&rsquo;s invoices below. Korra reads them in this browser and marks anything it is unsure about.</p>}
-    </div>
-  );
+
+const arrow = "inline-flex size-11 items-center justify-center rounded-full border border-line text-lg font-bold hover:bg-accent-soft";
+const summary = "flex min-h-11 cursor-pointer items-center rounded-2xl border border-line bg-surface px-5 py-3 font-bold marker:content-none [&::-webkit-details-marker]:hidden";
+
+/** The invoice the URL hash points at: `#inv-<invoiceId>` or `#inv-<invoiceId>-<field>`. */
+function invoiceFromHash(hash: string, state: MonthStateWire): string | null {
+  const h = hash.replace(/^#/, "");
+  return state.invoices.find((i) => h === `inv-${i.id}` || h.startsWith(`inv-${i.id}-`))?.id ?? null;
 }
 
-const EDF_UPLOAD_DESCRIPTION = "Add this month's invoices (PDF, or a Deel export CSV).";
-
-/** One month's workspace. With `readOnly` the upload panel, editing, match buttons and generate buttons are gone. */
-export function MonthView({
-  month,
-  state,
-  banks,
-  packs,
-  readOnly = false,
-  onChanged,
-  onPoll,
-  uploadDescription,
-  mode = "full",
-  step,
-}: MonthViewProps) {
+/** One month's workspace: its stage and next step, invoice cards (each opens a sheet), documents, payments and packs. */
+export function MonthView({ month, state, banks, packs, readOnly = false, onChanged, onPoll, uploadDescription }: MonthViewProps) {
   const nav = useNav();
   const { Link } = nav;
-  const isEdf = mode === "edf";
-  const elsewhere = [...new Set(state.documents.flatMap((d) => d.invoiceMonths))].filter((m) => m !== month).sort();
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [panel, setPanel] = useState<"documents" | "manual" | null>(null);
+  const hashHandled = useRef(false);
 
-  const current = currentMonthIST();
-  const recentMonths = [current, shiftMonth(current, -1), shiftMonth(current, -2)];
-  const monthOptions = recentMonths.includes(month) ? recentMonths : [month, ...recentMonths];
+  // `#inv-<id>` opens that invoice's sheet: on mount (the state may arrive a moment later) and when the hash changes.
+  useEffect(() => {
+    if (hashHandled.current) return;
+    const id = invoiceFromHash(window.location.hash, state);
+    if (id) { hashHandled.current = true; setOpenId(id); }
+  }, [state]);
+  useEffect(() => {
+    const onHash = () => { const id = invoiceFromHash(window.location.hash, state); if (id) setOpenId(id); };
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
+  }, [state]);
+
+  const elsewhere = [...new Set(state.documents.flatMap((d) => d.invoiceMonths))].filter((m) => m !== month).sort();
+  const stage = monthStage(state, packs);
+  const next = readOnly ? null : monthNextStep(month, state, packs);
+  const prev = shiftMonth(month, -1);
+  const following = shiftMonth(month, 1);
+  const openInvoice = openId ? state.invoices.find((i) => i.id === openId) ?? null : null;
+  const bankName = (id: string) => banks.find((b) => b.id === id)?.name ?? "Your bank";
 
   return (
     <div className="space-y-6">
-      {step}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0 space-y-2">
-          <h1 className="text-2xl font-semibold sm:text-3xl">
-            {isEdf ? `Your ${monthLabel(month)} invoices` : monthLabel(month)}
-          </h1>
-          {isEdf && !readOnly && <EdfStatus month={month} state={state} />}
-        </div>
-        {isEdf ? (
-          <div className="flex items-center gap-2 sm:pt-2">
-            <label htmlFor="change-month" className="whitespace-nowrap text-xs font-medium text-muted">Change month</label>
-            <Select
-              id="change-month"
-              aria-label="Change month"
-              value={month}
-              onChange={(e) => nav.push(nav.hrefs.month(e.target.value))}
-              className="w-auto py-1 text-sm"
-            >
-              {monthOptions.map((m) => (
-                <option key={m} value={m}>{monthLabel(m)}</option>
-              ))}
-            </Select>
-          </div>
-        ) : (
+      <header className="space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <h1 className="min-w-0 text-3xl">{monthLabel(month)}</h1>
           <nav aria-label="Month" className="flex gap-2">
-            <Link href={nav.hrefs.month(shiftMonth(month, -1))} className={buttonClass("secondary", "sm")} aria-label={`Previous month, ${monthLabel(shiftMonth(month, -1))}`}>Previous</Link>
-            <Link href={nav.hrefs.month(shiftMonth(month, 1))} className={buttonClass("secondary", "sm")} aria-label={`Next month, ${monthLabel(shiftMonth(month, 1))}`}>Next</Link>
+            <Link href={nav.hrefs.month(prev)} className={arrow} aria-label={`Previous month, ${monthLabel(prev)}`}><span aria-hidden="true">‹</span></Link>
+            <Link href={nav.hrefs.month(following)} className={arrow} aria-label={`Next month, ${monthLabel(following)}`}><span aria-hidden="true">›</span></Link>
           </nav>
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <Badge tone={STAGE_TONE[stage]}>{STAGE_LABEL[stage]}</Badge>
+          <span className="text-sm text-muted">EDF due {dateLabel(edfDueDate(month))}</span>
+        </div>
+        {next && (
+          <Link href={"task" in next.to ? nav.hrefs.task(next.to.task) : nav.hrefs.settings()} className={buttonClass("primary", "lg")}>{next.label}</Link>
         )}
-      </div>
+      </header>
+
+      <section aria-labelledby="invoices-h" id="invoices" className="space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 id="invoices-h" className="text-xl">Invoices ({state.invoices.length})</h2>
+          {!readOnly && (
+            <div className="flex flex-wrap gap-2">
+              <Button variant="secondary" size="sm" onClick={() => setPanel("documents")}>Add documents</Button>
+              <Button variant="secondary" size="sm" onClick={() => setPanel("manual")}>Add an invoice by hand</Button>
+            </div>
+          )}
+        </div>
+        {state.invoices.length === 0 ? (
+          <p className="rounded-2xl bg-surface-soft p-5 text-sm text-muted">
+            {elsewhere.length > 0
+              ? <>No invoices dated in this month. Invoices from this month&rsquo;s uploads are dated in <MonthLinks months={elsewhere} />.</>
+              : readOnly ? "No invoices for this month." : "No invoices for this month yet."}
+          </p>
+        ) : (
+          <ul className="grid gap-3 md:grid-cols-2">
+            {state.invoices.map((inv) => (
+              <li key={inv.id}><InvoiceCard invoice={inv} realisation={state.realisations[inv.id]} onOpen={() => setOpenId(inv.id)} /></li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section aria-labelledby="packs-h" id="packs" className="space-y-3">
+        <h2 id="packs-h" className="text-xl">Packs</h2>
+        {packs.length === 0 ? (
+          <p className="text-sm text-muted">No pack for this month yet.</p>
+        ) : (
+          <ul className="space-y-2">
+            {packs.map((p) => (
+              <li key={p.id}>
+                <Link href={nav.hrefs.pack(p.id)} className="flex min-h-14 items-center justify-between gap-3 rounded-2xl border border-line bg-surface px-4 py-3 hover:bg-accent-soft">
+                  <span className="min-w-0">
+                    <span className="block font-bold">{bankName(p.adBankId)}</span>
+                    <span className="block text-sm text-muted">Made {dateLabel(p.generatedAt.slice(0, 10))}</span>
+                  </span>
+                  {p.status === "submitted" ? <Badge tone="ok">Sent ✓</Badge> : <Badge tone="accent">Not sent</Badge>}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <details>
+        <summary className={summary}>Documents ({state.documents.length})</summary>
+        <div className="mt-3">
+          <DocumentsSection month={month} documents={state.documents} banks={banks} lastSacCode={state.lastSacCode} readOnly={readOnly} onChanged={onChanged} onPoll={onPoll} />
+        </div>
+      </details>
+
+      <details>
+        <summary className={summary}>Payments &amp; matches</summary>
+        <div className="mt-3 space-y-6">
+          <PaymentsSection month={month} payments={state.payments} documents={state.documents} banks={banks} readOnly={readOnly} onChanged={onChanged} />
+          <MatchesSection allocations={state.allocations} invoices={state.invoices} payments={state.payments} readOnly={readOnly} onChanged={onChanged} />
+        </div>
+      </details>
+
+      <InvoiceSheet invoice={openInvoice} banks={banks} realisation={openInvoice ? state.realisations[openInvoice.id] : undefined} readOnly={readOnly} onClose={() => setOpenId(null)} onChanged={onChanged} />
 
       {!readOnly && (
-        <Card aria-labelledby="upload-h" id="upload">
-          <CardHeader id="upload-h" title="Upload" description={uploadDescription ?? (isEdf ? EDF_UPLOAD_DESCRIPTION : DEFAULT_UPLOAD_DESCRIPTION)} />
-          <CardBody>
-            <UploadPanel month={month} onUploaded={() => onChanged?.()} showHint={!isEdf} />
-          </CardBody>
-        </Card>
+        <>
+          <Sheet open={panel === "documents"} onClose={() => setPanel(null)} title="Add documents">
+            <div className="space-y-4">
+              <p className="text-sm text-muted">{uploadDescription ?? DEFAULT_UPLOAD_DESCRIPTION}</p>
+              <UploadPanel month={month} onUploaded={() => onChanged?.()} />
+            </div>
+          </Sheet>
+          <Sheet open={panel === "manual"} onClose={() => setPanel(null)} title="Add an invoice by hand">
+            <ManualInvoiceForm month={month} banks={banks} lastSacCode={state.lastSacCode} onCancel={() => setPanel(null)} onDone={() => { setPanel(null); onChanged?.(); }} />
+          </Sheet>
+        </>
       )}
-
-      <DocumentsSection month={month} documents={state.documents} banks={banks} lastSacCode={state.lastSacCode} readOnly={readOnly} onChanged={onChanged} onPoll={onPoll} />
-      <InvoicesSection month={month} invoices={state.invoices} banks={banks} realisations={state.realisations} lastSacCode={state.lastSacCode} elsewhere={elsewhere} readOnly={readOnly} onChanged={onChanged} />
-      {!isEdf && <PaymentsSection month={month} payments={state.payments} documents={state.documents} banks={banks} readOnly={readOnly} onChanged={onChanged} />}
-      {!isEdf && <MatchesSection allocations={state.allocations} invoices={state.invoices} payments={state.payments} readOnly={readOnly} onChanged={onChanged} />}
-      <PacksSection month={month} blockersByBank={state.blockersByBank} invoices={state.invoices} packs={packs} readOnly={readOnly} onChanged={onChanged} mode={mode} />
     </div>
   );
 }

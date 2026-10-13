@@ -27,6 +27,18 @@ export function currentMonthIST(now: Date = new Date()): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit" }).format(now).slice(0, 7);
 }
 
+/** Today's date in India, YYYY-MM-DD. */
+export function todayIST(now: Date = new Date()): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
+}
+
+/** Sums money per currency (first-seen currency order). */
+export function sumMoney(amounts: MoneyWire[]): MoneyWire[] {
+  const sums = new Map<string, bigint>();
+  for (const a of amounts) sums.set(a.currency, (sums.get(a.currency) ?? 0n) + BigInt(a.minor));
+  return [...sums.entries()].map(([currency, minor]) => ({ currency, minor: minor.toString() }));
+}
+
 export const FIELD_LABELS: Record<string, string> = {
   invoiceNo: "Invoice number", invoiceDate: "Invoice date", clientName: "Client name", clientAddress: "Client address",
   clientCountry: "Client country", amount: "Invoice amount", netRealisableValue: "Net realisable value",

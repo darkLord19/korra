@@ -27,15 +27,15 @@ export function SettingsScreen({ initial, slots = {} }: { initial?: OnboardingWi
   const { caSharing, backup } = api.capabilities;
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <h1 className="text-3xl font-semibold">Settings</h1>
+      <h1 className="text-3xl">Settings</h1>
 
-      <Card aria-labelledby="profile-h">
-        <CardHeader id="profile-h" title="Exporter profile" description="These details go on every EDF. The bank you choose is where new invoices are filed." />
+      <Card aria-labelledby="profile-h" className="overflow-hidden rounded-3xl">
+        <CardHeader id="profile-h" title="Your details" description="These go on every EDF. The bank you choose is where new invoices are filed." />
         <CardBody><ProfileForm profile={ob.profile} banks={ob.banks} submitLabel="Save profile" onSaved={() => void reload()} /></CardBody>
       </Card>
 
-      <Card aria-labelledby="signature-h">
-        <CardHeader id="signature-h" title="Authorised signature" description="Stamped onto your generated EDFs. This is an image of your signature, not a DSC." />
+      <Card aria-labelledby="signature-h" className="overflow-hidden rounded-3xl">
+        <CardHeader id="signature-h" title="Signature" description="Stamped onto your generated EDFs. This is an image of your signature, not a DSC." />
         <CardBody><SignaturePad profile={ob.profile} onSaved={() => void reload()} /></CardBody>
       </Card>
 

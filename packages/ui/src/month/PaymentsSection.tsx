@@ -33,7 +33,7 @@ export function PaymentsSection({ month, payments, documents, banks, readOnly = 
           <div className="px-5"><ManualPaymentForm month={month} onCancel={() => setAdding(false)} onDone={() => { setAdding(false); onChanged?.(); }} /></div>
         )}
         {payments.length === 0 ? (
-          <p className="px-5 text-sm text-muted">{readOnly ? "No payments for this month." : "No payments yet. Upload your Deel transactions export or a FIRA above."}</p>
+          <p className="px-5 text-sm text-muted">{readOnly ? "No payments for this month." : "No payments yet. Add your Deel transactions export or a FIRA with “Add documents”."}</p>
         ) : (
           <Table>
             <thead>

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { OnboardingWire, PackWire, TrackerWire, MonthStateWire, BlockerWire, TrackerRowWire } from "@korra/backend/schemas";
-import { deriveTasks, findTask, type Task, type TaskInput } from "./tasks";
+import { deriveTasks, findTask, taskFromId, type Task, type TaskInput } from "./tasks";
 import { dateLabel } from "../lib/format";
 import { field, invoice, monthState } from "../test-utils";
 
@@ -239,7 +239,7 @@ describe("deriveTasks: realisation", () => {
     const r = deriveTasks(input({ tracker: tracker(trackerRow("a", "open", deadline, "INV-7")) }));
     expect(r.hero).toEqual({
       id: "realisation:a", kind: "realisation", title: "INV-7: payment due in 20 days", detail: "Due 2 Nov 2026",
-      due: deadline, urgency: "soon", icon: "⏳", invoiceId: "a",
+      due: deadline, urgency: "soon", icon: "⏳", invoiceId: "a", month: "2026-09",
     });
   });
 
@@ -411,5 +411,26 @@ describe("findTask", () => {
   it("returns null for an unknown id or an empty list", () => {
     expect(findTask({ hero: t1, rest: [t2] }, "nope")).toBeNull();
     expect(findTask({ hero: null, rest: [] }, "one")).toBeNull();
+  });
+});
+
+describe("realisation month and taskFromId", () => {
+  it("gives a realisation task the month of its invoice date, and none when the invoice has no date", () => {
+    const dated = deriveTasks(input({ tracker: tracker(trackerRow("a", "open", addDays(TODAY, 20))) }));
+    expect(dated.hero?.month).toBe("2026-09");
+    const row = trackerRow("b", "open", addDays(TODAY, 20));
+    row.invoice = invoice({ id: "b", invoiceDate: field(null, 0, "default") });
+    expect(deriveTasks(input({ tracker: tracker(row) })).hero?.month).toBeUndefined();
+  });
+
+  it("rebuilds the kinds that open a flow from their id", () => {
+    expect(taskFromId("upload:2026-09")).toMatchObject({ kind: "upload", month: "2026-09" });
+    expect(taskFromId("review:2026-09")).toMatchObject({ kind: "review", month: "2026-09" });
+    expect(taskFromId("generate:2026-09:bank1")).toMatchObject({ kind: "generate", month: "2026-09", adBankId: "bank1" });
+    expect(taskFromId("submit:pack-1")).toMatchObject({ kind: "submit", packId: "pack-1" });
+  });
+
+  it("returns null for anything else", () => {
+    for (const id of ["setup", "backup", "realisation:a", "upload:soon", "review:2026-13", "generate:2026-09", "submit:", "nope"]) expect(taskFromId(id)).toBeNull();
   });
 });
