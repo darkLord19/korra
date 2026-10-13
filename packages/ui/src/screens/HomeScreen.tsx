@@ -2,13 +2,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { edfDueDate } from "@korra/core";
 import type { MonthStateWire, OnboardingWire, PackWire, TrackerWire } from "@korra/backend/schemas";
-import { Alert, Badge, Button, buttonClass, cx, EmptyState, IconBubble, Skeleton } from "../components";
+import { Alert, Badge, buttonClass, cx, EmptyState, IconBubble, Skeleton } from "../components";
 import { useApi, useNav, type KorraNav } from "../context";
 import { errorMessage } from "../errors";
 import type { FlowProps } from "../flows/types";
 import { TaskFlow } from "../home/TaskFlow";
 import { deriveTasks, findTask, taskFromId, type Task } from "../home/tasks";
-import { dateLabel, monthLabel, shiftMonth, todayIST } from "../lib/format";
+import { dateLabel, greetingName, monthLabel, shiftMonth, todayIST } from "../lib/format";
+import { useMediaQuery } from "../lib/use-media";
 import { usePoll } from "../lib/use-poll";
 
 interface HomeData {
@@ -19,7 +20,9 @@ interface HomeData {
 }
 
 const POLL_MS = 3000;
-const TOAST_MS = 4500;
+const TOAST_MS = 4000;
+/** `lg`: where the list and a flow sit side by side. */
+const WIDE = "(min-width: 1024px)";
 const CHIP: Record<Task["urgency"], { tone: "danger" | "flag" | "neutral"; label: string }> = {
   urgent: { tone: "danger", label: "Urgent" },
   soon: { tone: "flag", label: "Due soon" },
@@ -53,12 +56,13 @@ function ListSkeleton() {
   );
 }
 
-function HeroCard({ task }: { task: Task }) {
+/** The next thing to do. `selected` (its flow is open beside the list) is a ring, never a lowered opacity. */
+function HeroCard({ task, selected }: { task: Task; selected: boolean }) {
   const { Link, hrefs } = useNav();
   const open = task.kind === "realisation" || task.href === "settings";
   return (
-    <div className="hero-gradient animate-pop-in rounded-3xl p-6 text-white shadow-lg">
-      <p className="text-sm font-semibold text-white/85">{task.detail}</p>
+    <div {...(selected ? { "aria-current": "true" as const } : {})} className={cx("hero-gradient rounded-3xl p-6 text-white shadow-lg", selected && "ring-4 ring-accent/30")}>
+      <p className="text-sm font-semibold text-white">{task.detail}</p>
       <h2 className="mt-1 text-2xl font-extrabold leading-tight text-white">{task.title}</h2>
       <Link href={taskHref(task, hrefs)} className="mt-5 inline-flex min-h-12 items-center justify-center rounded-full bg-white px-7 text-base font-extrabold text-[#5846d6] hover:bg-white/90">
         {open ? "Open" : "Let's go"}
@@ -104,8 +108,9 @@ function AllCaughtUp({ today }: { today: string }) {
 
 /**
  * The to-do list. Shows the one next thing as a hero card, the rest as rows, and the flow for `taskId` (the app's
- * `?task=` param) beside the list on desktop or instead of it on a phone. `onSelectTask` is how the app changes the
- * URL; by default that is `nav.push`.
+ * `?task=` param) beside the list on desktop or instead of it on a phone. With no `taskId`, desktop (`lg`) opens the
+ * hero task's flow in that pane anyway (the URL stays `/home`); a phone shows the list only. `onSelectTask` is how the
+ * app changes the URL; by default that is `nav.push`.
  */
 export function HomeScreen({ taskId, onSelectTask, extraTasks, renderExtraTask, afterSubmit, today: todayProp }: {
   taskId: string | null;
@@ -133,6 +138,11 @@ export function HomeScreen({ taskId, onSelectTask, extraTasks, renderExtraTask, 
   // "That's already done" is only for a task that was never on screen in this visit.
   const shown = useRef<Task | null>(null);
   const seq = useRef(0);
+  const wide = useMediaQuery(WIDE);
+  // The hero whose flow shows beside the list when there is no `?task=`. It is pinned once shown: finishing a step (a
+  // saved profile, an uploaded invoice) changes which task is the hero, and the flow in front of the person must not
+  // be swapped out under them. It unpins when the flow is done or a task is chosen.
+  const [pinned, setPinned] = useState<string | null>(null);
 
   const refresh = useCallback(async (): Promise<HomeData | null> => {
     const mine = ++seq.current;
@@ -161,8 +171,14 @@ export function HomeScreen({ taskId, onSelectTask, extraTasks, renderExtraTask, 
   const derive = useCallback((d: HomeData) => deriveTasks({ ...d, today }, extraTasks), [today, extraTasks]);
   const tasks = useMemo(() => (data ? derive(data) : null), [data, derive]);
 
-  const known: Task | null = taskId === null ? null : (tasks ? findTask(tasks, taskId) : null) ?? taskFromId(taskId);
-  const selected: Task | null = known ?? (taskId !== null && shown.current?.id === taskId ? shown.current : null);
+  // A hero that lives elsewhere (Settings) has no flow here: it stays a card with an Open link.
+  const heroId = tasks?.hero && tasks.hero.href !== "settings" ? tasks.hero.id : null;
+  useEffect(() => { setPinned(taskId === null ? (prev) => prev ?? heroId : null); }, [taskId, heroId]);
+  const previewId = wide && taskId === null ? pinned ?? heroId : null;
+  const activeId = taskId ?? previewId;
+
+  const known: Task | null = activeId === null ? null : (tasks ? findTask(tasks, activeId) : null) ?? taskFromId(activeId);
+  const selected: Task | null = known ?? (activeId !== null && shown.current?.id === activeId ? shown.current : null);
   useEffect(() => { shown.current = selected; });
   const waiting = taskId !== null && selected === null && !tasks && !error;
   const total = tasks ? (tasks.hero ? 1 : 0) + tasks.rest.length : 0;
@@ -170,16 +186,17 @@ export function HomeScreen({ taskId, onSelectTask, extraTasks, renderExtraTask, 
   async function handleDone(next?: string) {
     const fresh = (await refresh()) ?? data;
     const after = fresh ? derive(fresh) : null;
-    const candidate = next ?? (after ? [after.hero, ...after.rest].find((t) => t && t.id !== taskId)?.id : undefined) ?? null;
+    const candidate = next ?? (after ? [after.hero, ...after.rest].find((t) => t && t.id !== activeId)?.id : undefined) ?? null;
     const found = candidate && after ? findTask(after, candidate) : null;
     if (found) setToast(`Nice! Next up: ${found.title}`);
+    setPinned(null);
     select(candidate);
   }
 
-  const firstName = data?.onboarding.profile?.legalName?.trim().split(/\s+/)[0];
+  const firstName = greetingName(data?.onboarding.profile?.legalName);
   const setupFirst = tasks?.hero?.kind === "setup";
   const headline = setupFirst ? "Let's get you set up" : total === 0 ? "You're all caught up 🎉" : `${total} ${total === 1 ? "thing needs" : "things need"} you`;
-  const twoPane = taskId !== null || !!tasks?.hero;
+  const twoPane = taskId !== null || previewId !== null;
 
   const list = (
     <div className={cx("space-y-6", taskId !== null && "hidden lg:block")}>
@@ -192,10 +209,10 @@ export function HomeScreen({ taskId, onSelectTask, extraTasks, renderExtraTask, 
             <h1 className="mt-1 text-3xl">{headline}</h1>
           </div>
           {error && <Alert tone="danger">{error}</Alert>}
-          {tasks.hero && <HeroCard task={tasks.hero} />}
+          {tasks.hero && <HeroCard task={tasks.hero} selected={tasks.hero.id === activeId} />}
           {tasks.rest.length > 0 && (
             <ul aria-label="More to do" className="space-y-2">
-              {tasks.rest.map((t) => <TaskRow key={t.id} task={t} selected={t.id === taskId} />)}
+              {tasks.rest.map((t) => <TaskRow key={t.id} task={t} selected={t.id === activeId} />)}
             </ul>
           )}
           {total === 0 && <AllCaughtUp today={today} />}
@@ -218,7 +235,7 @@ export function HomeScreen({ taskId, onSelectTask, extraTasks, renderExtraTask, 
   );
 
   let pane: ReactNode;
-  if (taskId !== null) {
+  if (taskId !== null || previewId !== null) {
     if (selected) {
       pane = <TaskFlow key={selected.id} task={selected} onDone={(next) => void handleDone(next)} onClose={() => select(null)} {...(afterSubmit !== undefined ? { afterSubmit } : {})} {...(renderExtraTask ? { renderExtraTask } : {})} />;
     } else if (waiting) {
@@ -228,27 +245,16 @@ export function HomeScreen({ taskId, onSelectTask, extraTasks, renderExtraTask, 
     } else {
       pane = <EmptyState icon="✅" title="That's already done ✓" action={<Link href={hrefs.home()} className={buttonClass("primary")}>Back to Home</Link>}>Nothing more to do here.</EmptyState>;
     }
-  } else if (tasks?.hero) {
-    const hero = tasks.hero;
-    pane = (
-      <div className="flex min-h-80 flex-col items-center justify-center gap-4 rounded-3xl bg-surface-soft p-8 text-center">
-        <IconBubble icon={hero.icon} />
-        <p className="text-xl font-extrabold">Start with: {hero.title}</p>
-        <p className="text-sm text-muted">{hero.detail}</p>
-        {hero.kind === "realisation" || hero.href === "settings"
-          ? <Link href={taskHref(hero, hrefs)} className={buttonClass("primary", "lg")}>Open</Link>
-          : <Button size="lg" onClick={() => select(hero.id)}>Let's go</Button>}
-      </div>
-    );
   }
 
   return (
     <>
       <div className={cx("mx-auto", twoPane ? "lg:grid lg:grid-cols-[380px_1fr] lg:items-start lg:gap-10" : "max-w-xl")}>
         {list}
-        {twoPane && <div className={cx("min-w-0", taskId === null && "hidden lg:block")}>{pane}</div>}
+        {twoPane && <div className={cx("min-w-0", taskId === null && "hidden lg:block", taskId === null && "[&_[data-flow-close]]:hidden")}>{pane}</div>}
       </div>
-      <div role="status" aria-live="polite" className="pointer-events-none fixed inset-x-4 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-40 mx-auto max-w-sm md:bottom-6">
+      {/* At the top, under the bar: below `lg` the bottom edge is taken by the flow's sticky action bar (and the tab bar). */}
+      <div role="status" aria-live="polite" className="pointer-events-none fixed inset-x-4 top-[4.75rem] z-40 mx-auto max-w-sm lg:top-auto lg:bottom-6">
         {toast && <p className="animate-pop-in rounded-full bg-ink px-5 py-3 text-center text-sm font-bold text-bg shadow-lg">{toast}</p>}
       </div>
     </>

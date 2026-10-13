@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { MonthStateWire, OnboardingWire, PackWire } from "@korra/backend/schemas";
 import { currentMonthIST, shiftMonth } from "../lib/format";
 import type { Task } from "../home/tasks";
@@ -30,6 +30,11 @@ const homeApi = (onboarding: OnboardingWire, states: Record<string, MonthStateWi
 const home = (api: ReturnType<typeof fakeApi>, props: Partial<Parameters<typeof HomeScreen>[0]> = {}) =>
   render(<Wrap api={api}><HomeScreen taskId={null} today={TODAY} {...props} /></Wrap>);
 
+/** jsdom has no `matchMedia`: stub the `lg` query as matching (desktop) or not (phone). */
+const viewport = (wide: boolean) =>
+  vi.stubGlobal("matchMedia", (media: string) => ({ matches: wide, media, addEventListener: () => undefined, removeEventListener: () => undefined }));
+afterEach(() => vi.unstubAllGlobals());
+
 describe("HomeScreen", () => {
   it("before setup, the hero is 'Set up and file your first EDF' and links to the setup flow", async () => {
     home(homeApi(incomplete));
@@ -45,6 +50,16 @@ describe("HomeScreen", () => {
     expect(screen.getByRole("heading", { name: /need you|needs you/ })).toBeTruthy();
   });
 
+  it("greets by the first name in title case, and not at all by a company suffix", async () => {
+    const shout = { ...complete, profile: { ...complete.profile!, legalName: "JANE DEV CONSULTING" } };
+    const { unmount } = home(homeApi(shout));
+    expect(await screen.findByText("Hey 👋 Jane")).toBeTruthy();
+    unmount();
+    const suffix = { ...complete, profile: { ...complete.profile!, legalName: "PVT LTD" } };
+    home(homeApi(suffix));
+    expect(await screen.findByText("Hey 👋")).toBeTruthy();
+  });
+
   it("with a flagged invoice last month, the hero is a review task; the rest are rows with chips", async () => {
     const sep = monthState({ month: "2026-09", invoices: [invoice()], blockersByBank: flaggedBlockers });
     home(homeApi(complete, { "2026-09": sep }), { taskId: "review:2026-09" });
@@ -57,6 +72,64 @@ describe("HomeScreen", () => {
     const row = screen.getByRole("link", { name: /Add your October 2026 invoices/ });
     expect(row.getAttribute("href")).toBe("/home?task=upload%3A2026-10");
     expect(within(row).getByText(/Urgent|Due soon|FYI/)).toBeTruthy();
+  });
+
+  describe("with no ?task=", () => {
+    const flagged = () => homeApi(complete, { "2026-09": monthState({ month: "2026-09", invoices: [invoice()], blockersByBank: flaggedBlockers }) });
+
+    it("on desktop opens the hero's flow beside the list, marks the hero selected, and leaves the URL alone", async () => {
+      viewport(true);
+      const onSelectTask = vi.fn();
+      home(flagged(), { onSelectTask });
+      expect(await screen.findByRole("button", { name: "Looks right" })).toBeTruthy();
+      expect(screen.queryByText(/Start with:/)).toBeNull();
+      const hero = screen.getByRole("heading", { name: "1 quick check on September" });
+      expect(hero.parentElement!.getAttribute("aria-current")).toBe("true");
+      expect(hero.parentElement!.className).toContain("ring-4");
+      expect(hero.parentElement!.className).not.toMatch(/opacity/);
+      expect(onSelectTask).not.toHaveBeenCalled();
+    });
+
+    it("on desktop, finishing that flow moves on to the next task, not the hero again", async () => {
+      viewport(true);
+      const onSelectTask = vi.fn();
+      const states: Record<string, MonthStateWire> = { "2026-09": monthState({ month: "2026-09", invoices: [invoice()], blockersByBank: flaggedBlockers }) };
+      const editField = vi.fn(async () => {
+        states["2026-09"] = monthState({ month: "2026-09", invoices: [invoice()], blockersByBank: noBlockers });
+        return {} as never;
+      });
+      home(homeApi(complete, states, [], { editField }), { onSelectTask });
+      await userEvent.click(await screen.findByRole("button", { name: "Looks right" }));
+      await userEvent.click(await screen.findByRole("button", { name: "Make my pack" }));
+      await waitFor(() => expect(onSelectTask).toHaveBeenCalledWith("generate:2026-09:bank1"));
+    });
+
+    it("on a phone shows the list only", async () => {
+      viewport(false);
+      home(flagged());
+      await screen.findByRole("heading", { name: "1 quick check on September" });
+      expect(screen.queryByRole("button", { name: "Looks right" })).toBeNull();
+    });
+
+    it("on desktop with nothing to do stays a single column", async () => {
+      viewport(true);
+      const oct = monthState({ month: "2026-10", invoices: [invoice()], blockersByBank: noBlockers });
+      const sep = monthState({ month: "2026-09", invoices: [invoice()], blockersByBank: noBlockers });
+      const packs = [pack({ status: "submitted", submittedAt: "2026-10-05T00:00:00Z" }), pack({ id: "p2", month: "2026-10", status: "submitted", submittedAt: "2026-10-06T00:00:00Z" })];
+      const { container } = home(homeApi(complete, { "2026-10": oct, "2026-09": sep }, packs));
+      await screen.findByRole("heading", { name: "You're all caught up 🎉" });
+      expect(container.querySelector(".lg\\:grid")).toBeNull();
+      expect(screen.queryByRole("button", { name: "Close" })).toBeNull();
+    });
+
+    it("on desktop, a hero that lives in Settings stays a card (no flow to open)", async () => {
+      viewport(true);
+      const exporterMissing = [{ adBankId: "bank1", adBankName: "Acme Test Bank", placeholderLayout: false, blockers: [{ kind: "missing_field" as const, entity: "exporter" as const, id: "e1", field: "pan" }] }];
+      home(homeApi(complete, { "2026-09": monthState({ month: "2026-09", invoices: [invoice()], blockersByBank: exporterMissing }) }));
+      expect(await screen.findByRole("heading", { name: "Finish your details" })).toBeTruthy();
+      expect(screen.getByRole("link", { name: "Open" }).getAttribute("href")).toBe("/settings");
+      expect(screen.queryByRole("button", { name: "Close" })).toBeNull();
+    });
   });
 
   it("marks the selected row with aria-current", async () => {
@@ -121,6 +194,22 @@ describe("HomeScreen", () => {
     await userEvent.click(await screen.findByRole("button", { name: "Make my pack" }));
     await waitFor(() => expect(onSelectTask).toHaveBeenCalledWith("generate:2026-09:bank1"));
     expect(within(screen.getByRole("status")).getByText("Nice! Next up: Your September pack is ready to make")).toBeTruthy();
+  });
+
+  it("dismisses the toast by itself after about four seconds", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const backup: Task = { id: "backup", kind: "backup", title: "Back up your data", detail: "", urgency: "fyi", icon: "💾" };
+      home(homeApi(complete), { taskId: "backup", extraTasks: [backup], onSelectTask: vi.fn(), renderExtraTask: (_t, flow) => <button onClick={() => flow.onDone()}>Finish</button> });
+      await userEvent.click(await screen.findByRole("button", { name: "Finish" }));
+      expect(await screen.findByText(/Nice! Next up/)).toBeTruthy();
+      await act(() => vi.advanceTimersByTimeAsync(3500));
+      expect(screen.queryByText(/Nice! Next up/)).toBeTruthy();
+      await act(() => vi.advanceTimersByTimeAsync(700));
+      expect(screen.queryByText(/Nice! Next up/)).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("with no next task given, picks the first one left (not the one just done) and then toasts", async () => {

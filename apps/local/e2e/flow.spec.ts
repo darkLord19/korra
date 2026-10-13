@@ -151,6 +151,10 @@ async function mainFlow(page: Page, context: BrowserContext, request: APIRequest
   await f.getByRole("button", { name: "Close" }).click();
   await expect(page).toHaveURL(/\/home$/);
   await expect(listHeadline(page)).toBeVisible();
+  // With no ?task=, a desktop opens the hero's flow in the right pane (the URL stays /home); a phone shows the list only.
+  if (phone) await expect(flow(page)).toHaveCount(0);
+  else await expect(flow(page)).toBeVisible();
+  await expect(page).toHaveURL(/\/home$/);
   await expect(page.getByRole("link", { name: /Back up your data/ })).toHaveAttribute("href", "/home?task=backup");
   await expect(page.getByText("Sent September 2026 pack")).toBeVisible();
 
