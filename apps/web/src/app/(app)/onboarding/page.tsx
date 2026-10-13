@@ -1,10 +1,8 @@
-import { getOnboarding } from "@korra/backend";
-import { OnboardingScreen } from "@korra/ui";
-import { ownerCtx } from "@/server/ctx";
+import { redirect } from "next/navigation";
 
-export const metadata = { title: "Set up" };
 export const dynamic = "force-dynamic";
 
-export default async function OnboardingPage() {
-  return <OnboardingScreen initial={await getOnboarding(await ownerCtx())} />;
+/** Setup is the first task on Home. */
+export default function OnboardingPage() {
+  redirect("/home");
 }

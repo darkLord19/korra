@@ -1,15 +1,13 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { getOnboarding } from "@korra/backend";
-import { Alert, Footer, buttonClass, currentMonthIST } from "@korra/ui";
-import { currentUser, ownerCtx } from "@/server/ctx";
+import { Alert, Footer, buttonClass } from "@korra/ui";
+import { currentUser } from "@/server/ctx";
 
 export const dynamic = "force-dynamic";
 
 export default async function Home({ searchParams }: { searchParams: Promise<{ deleted?: string }> }) {
   if (await currentUser()) {
-    const ob = await getOnboarding(await ownerCtx());
-    redirect(ob.complete ? `/months/${currentMonthIST()}` : "/onboarding");
+    redirect("/home");
   }
   return (
     <div className="flex min-h-screen flex-col">

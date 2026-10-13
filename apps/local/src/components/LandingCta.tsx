@@ -1,50 +1,13 @@
-"use client";
 import Link from "next/link";
-import { buttonClass } from "@korra/ui";
-import { setFlow, useFlow } from "@/lib/flow";
 
+/** The one call to action on the landing page: a big white pill on the hero card. Everything starts at Home. */
 export function LandingCta() {
-  const flow = useFlow();
-
-  let label = "Prepare my EDF";
-  let href = "/onboarding";
-
-  if (flow === "started") {
-    label = "Continue your EDF";
-    href = "/month";
-  } else if (flow === "tracking") {
-    label = "Open Korra";
-    href = "/month";
-  }
-
-  return (
-    <div className="mt-8 flex flex-wrap items-center gap-4">
-      <Link href={href} className={buttonClass("primary")}>
-        {label}
-      </Link>
-      {flow !== "tracking" && (
-        <Link
-          href="/month"
-          onClick={() => setFlow("tracking")}
-          className="text-sm text-muted underline hover:text-ink"
-        >
-          Skip to full app
-        </Link>
-      )}
-    </div>
-  );
-}
-
-export function LandingSkipLink() {
-  const flow = useFlow();
-  if (flow === "tracking") return null;
   return (
     <Link
-      href="/month"
-      onClick={() => setFlow("tracking")}
-      className="text-sm text-muted underline hover:text-ink"
+      href="/home"
+      className="inline-flex min-h-14 w-full items-center justify-center rounded-full bg-white px-8 text-lg font-extrabold text-[#5846d6] shadow-md transition-colors hover:bg-white/90 sm:w-auto"
     >
-      Skip to full app
+      Get started
     </Link>
   );
 }

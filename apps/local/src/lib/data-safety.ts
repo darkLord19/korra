@@ -90,6 +90,16 @@ export function isBackupStale(lastBackupAt: number | null, now: number): boolean
   return age === null || age > STALE_AFTER_DAYS;
 }
 
+/** The Home "Back up your data" task shows once a pack exists and no backup was taken within this many days. */
+export const BACKUP_TASK_AFTER_DAYS = 7;
+
+/** Korra does not track when data last changed, so "older than the last change" is approximated by age. */
+export function isBackupTaskDue(hasPacks: boolean, lastBackupAt: number | null, now: number): boolean {
+  if (!hasPacks) return false;
+  const age = backupAgeDays(lastBackupAt, now);
+  return age === null || age >= BACKUP_TASK_AFTER_DAYS;
+}
+
 /** `korra-backup-YYYY-MM-DD.korra`, in the person's local calendar date. */
 export function backupFilename(date: Date): string {
   const p = (n: number) => String(n).padStart(2, "0");

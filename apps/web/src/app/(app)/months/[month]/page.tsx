@@ -17,7 +17,7 @@ export default async function MonthPage({ params }: { params: Promise<{ month: s
   if (!yearMonthSchema.safeParse(month).success) notFound();
   const ctx = await ownerCtx();
   const onboarding = await getOnboarding(ctx);
-  if (!onboarding.complete) redirect("/onboarding");
+  if (!onboarding.complete) redirect("/home");
   // Hobby crons run once a day, so retry this owner's stuck documents here (the daily sweep is the backstop).
   const stuck = await requeueStuckIngests(ctx);
   if (stuck.length > 0) {

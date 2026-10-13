@@ -1,81 +1,61 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { yearMonthSchema } from "@korra/backend/schemas";
-import { Alert, MonthScreen, PackScreen, SettingsScreen, TrackerScreen, OnboardingScreen, Stepper, currentMonthIST, errorMessage, useApi, useNav, type SettingsSlots } from "@korra/ui";
-import { setFlow, useFlow } from "@/lib/flow";
-import { fileHeldInvoice, holdInvoice } from "@/lib/pending-invoice";
+import { Alert, HomeScreen, MonthScreen, MonthsScreen, PackScreen, SettingsScreen, useNav, type SettingsSlots } from "@korra/ui";
+import { AfterSubmitCard, renderExtraTask, useBackupTasks } from "./BackupTask";
 import { BackupPanel, DataPanel } from "./DataPanels";
 import { ExportPanels } from "./ExportPanels";
-import { KeepTrackingCard } from "./KeepTrackingCard";
 import { PrivacyPanel } from "./PrivacyCopy";
 
 const Loading = () => <p className="text-sm text-muted" role="status">Loading...</p>;
 
-export const OnboardingRoute = () => (
-  <OnboardingScreen
-    step={<Stepper current={1} />}
-    onSaved={(invoice) => { holdInvoice(invoice); setFlow("started"); }}
-  />
-);
-export const TrackerRoute = () => <TrackerScreen />;
 // Backup/restore, exports, privacy and the danger zone belong to this app (the screen shows `backup` because `capabilities.backup` is set).
 const settingsSlots: SettingsSlots = { backup: <><BackupPanel /><ExportPanels /></>, data: <><PrivacyPanel /><DataPanel /></> };
 export const SettingsRoute = () => <SettingsScreen slots={settingsSlots} />;
 
-/** `/month?m=YYYY-MM`. A missing or malformed month goes to the current one; before onboarding is complete, to onboarding. */
-export function MonthRoute() {
-  const api = useApi();
+const afterSubmit = <AfterSubmitCard />;
+
+/** `/home?task=<id>`: the to-do list, with the app's backup task and the backup card after a pack is sent. */
+export function HomeRoute() {
+  const taskId = useSearchParams().get("task");
+  const extraTasks = useBackupTasks(taskId);
+  if (extraTasks === null) return <Loading />;
+  return <HomeScreen taskId={taskId} extraTasks={extraTasks} renderExtraTask={renderExtraTask} afterSubmit={afterSubmit} />;
+}
+
+/** `/months`: the index; `/months?m=YYYY-MM`: one month. A malformed month goes back to the index. */
+export function MonthsRoute() {
   const router = useRouter();
   const nav = useNav();
   const raw = useSearchParams().get("m");
   const month = raw !== null && yearMonthSchema.safeParse(raw).success ? raw : null;
-  const [ready, setReady] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const invalid = raw !== null && month === null;
 
   useEffect(() => {
-    if (month === null) router.replace(nav.hrefs.month(currentMonthIST()));
-  }, [month, router, nav]);
+    if (invalid) router.replace(nav.hrefs.months());
+  }, [invalid, router, nav]);
 
-  useEffect(() => {
-    let live = true;
-    api.getOnboarding().then(
-      async (ob) => {
-        if (!live) return;
-        if (!ob.complete) return router.replace("/onboarding");
-        // An invoice that filled in the setup form is filed first, so the page's first load already lists it (under its own month).
-        const filedIn = await fileHeldInvoice(api);
-        if (!live) return;
-        if (filedIn) router.replace(nav.hrefs.month(filedIn));
-        setReady(true);
-      },
-      (e: unknown) => { if (live) setError(errorMessage(e)); },
-    );
-    return () => { live = false; };
-  }, [api, router, nav]);
-
-  if (error) return <Alert tone="danger">{error}</Alert>;
-  if (month === null || !ready) return <Loading />;
-  return <MonthScreen key={month} month={month} />;
-}
-
-/** `/home`: for now the current month (a stand-in until Home exists). */
-export const HomeRoute = () => <MonthRoute />;
-
-/** `/months`: one month with `?m=YYYY-MM`, otherwise the tracker (a stand-in until the months index exists). */
-export function MonthsRoute() {
-  return useSearchParams().get("m") === null ? <TrackerRoute /> : <MonthRoute />;
+  if (invalid) return <Loading />;
+  return month === null ? <MonthsScreen /> : <MonthScreen key={month} month={month} />;
 }
 
 /** `/pack?id=...` */
 export function PackRoute() {
   const id = useSearchParams().get("id");
-  const flow = useFlow();
   if (!id) return <Alert tone="danger">No pack was chosen.</Alert>;
-  return (
-    <>
-      <PackScreen key={id} packId={id} />
-      {flow !== "tracking" && <KeepTrackingCard />}
-    </>
-  );
+  return <PackScreen key={id} packId={id} />;
+}
+
+/** A client-side redirect (every page here is prerendered, so there is no server redirect). */
+export function RedirectTo({ to }: { to: string }) {
+  const router = useRouter();
+  useEffect(() => { router.replace(to); }, [router, to]);
+  return <Loading />;
+}
+
+/** The old `/month?m=X` URL: the same month under `/months`. */
+export function MonthRedirect() {
+  const m = useSearchParams().get("m");
+  return <RedirectTo to={m === null ? "/months" : `/months?m=${encodeURIComponent(m)}`} />;
 }

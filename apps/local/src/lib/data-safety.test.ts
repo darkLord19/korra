@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  backupAgeDays, backupFilename, DAY_MS, describeLastBackup, isBackupStale, isProtected, isWebKit, parseLastBackup, parseShown,
+  backupAgeDays, backupFilename, BACKUP_TASK_AFTER_DAYS, isBackupTaskDue, DAY_MS, describeLastBackup, isBackupStale, isProtected, isWebKit, parseLastBackup, parseShown,
   persistLabel, persistStatus, promptDue, promptMessage, shouldAdviseHomeScreen, shouldAskPersist, STALE_AFTER_DAYS, type BrowserEnv,
 } from "./data-safety";
 
@@ -117,5 +117,18 @@ describe("backup prompt scheduling", () => {
   it("reads the session list defensively", () => {
     expect(parseShown('["pack","stale","x"]')).toEqual(["pack", "stale"]);
     for (const bad of [null, undefined, "", "{", '{"a":1}', "7"]) expect(parseShown(bad)).toEqual([]);
+  });
+});
+
+describe("backup task", () => {
+  it("needs a pack first", () => {
+    expect(isBackupTaskDue(false, null, NOW)).toBe(false);
+    expect(isBackupTaskDue(false, ago(30), NOW)).toBe(false);
+  });
+  it("is due when never backed up, or when the last backup is a week old or older", () => {
+    expect(isBackupTaskDue(true, null, NOW)).toBe(true);
+    expect(isBackupTaskDue(true, ago(BACKUP_TASK_AFTER_DAYS), NOW)).toBe(true);
+    expect(isBackupTaskDue(true, ago(BACKUP_TASK_AFTER_DAYS - 1), NOW)).toBe(false);
+    expect(isBackupTaskDue(true, NOW, NOW)).toBe(false);
   });
 });

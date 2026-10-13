@@ -8,5 +8,5 @@ export const metadata = { title: "Client months" };
 
 export default async function ClientMonthsPage({ params }: { params: Promise<{ ownerId: string }> }) {
   const { ownerId } = await params;
-  return <TrackerView tracker={await getTracker(await caCtx(ownerId)).catch(notFoundOrThrow)} readOnly />;
+  return <TrackerView tracker={await getTracker(await caCtx(ownerId)).catch(notFoundOrThrow)} readOnly heading="h1" />;
 }

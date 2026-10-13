@@ -33,7 +33,7 @@ export default async function CaClientsPage() {
                   </div>
                   <div className="flex gap-2">
                     <Link href={`/ca/${c.ownerUserId}/months/${month}`} className={buttonClass("secondary", "sm")} aria-label={`Open ${c.ownerName}'s records`}>Records</Link>
-                    <Link href={`/ca/${c.ownerUserId}/tracker`} className={buttonClass("secondary", "sm")} aria-label={`Open ${c.ownerName}'s tracker`}>Tracker</Link>
+                    <Link href={`/ca/${c.ownerUserId}/months`} className={buttonClass("secondary", "sm")} aria-label={`Open ${c.ownerName}'s tracker`}>Tracker</Link>
                   </div>
                 </li>
               ))}

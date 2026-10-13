@@ -11,8 +11,6 @@ import { BLOB_DB_NAME, boot, shutdown } from "./boot";
 import { backupFilename } from "./data-safety";
 import { saveFile } from "./download";
 import { clearOwnedStorage, recordBackup, setLifecycle, setNoticeForNextLoad } from "./safety-store";
-import { setFlow } from "./flow";
-import { currentMonthIST } from "@korra/ui";
 import { otherTabCount, waitForDatabaseRelease } from "./tab-lock";
 
 /** An error whose message is safe and useful to show as is. */
@@ -162,8 +160,7 @@ export async function runRestore(prepared: PreparedRestore): Promise<void> {
   clearOwnedStorage();
   if (Number.isFinite(madeAt)) recordBackup(madeAt);
   setNoticeForNextLoad("Your backup was restored.");
-  setFlow("tracking");
-  location.assign(`/month?m=${encodeURIComponent(currentMonthIST())}`);
+  location.assign("/home");
 }
 
 /* ------------------------------------ delete all ------------------------------------ */

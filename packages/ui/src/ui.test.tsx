@@ -1,11 +1,9 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import { Stepper } from "./components/Stepper";
 import { KorraApiError } from "./errors";
 import { ProfileForm } from "./forms/ProfileForm";
 import { SignaturePad } from "./forms/SignaturePad";
-import { OnboardingScreen } from "./screens/OnboardingScreen";
 import { SettingsScreen } from "./screens/SettingsScreen";
 import { Wrap, fakeApi } from "./test-utils";
 
@@ -219,9 +217,9 @@ describe("profile form: filling it from an invoice", () => {
     return { extractProfileFromInvoice, saveProfile, saveBank };
   };
 
-  it("is offered on the onboarding screen only, not in settings", async () => {
-    render(<Wrap api={fakeApi({ getOnboarding: vi.fn().mockResolvedValue({ profile: null, banks: [], complete: false }) })}><OnboardingScreen /></Wrap>);
-    expect(await screen.findByText("Have an invoice handy? Drop it here to fill this in")).toBeTruthy();
+  it("is offered only when the form asks for it (not in settings)", async () => {
+    render(<Wrap api={fakeApi()}><ProfileForm profile={null} banks={[]} fillFromInvoice /></Wrap>);
+    expect(screen.getByText("Have an invoice handy? Drop it here to fill this in")).toBeTruthy();
     render(<Wrap api={fakeApi()}><ProfileForm profile={null} banks={[]} /></Wrap>);
     expect(screen.getAllByTestId("invoice-fill-input")).toHaveLength(1);
   });
@@ -315,37 +313,6 @@ describe("profile form: filling it from an invoice", () => {
     await userEvent.selectOptions(screen.getByLabelText("Which bank receives your foreign payments?"), "HDFC Bank");
     await userEvent.click(screen.getByRole("button", { name: "Save and continue" }));
     await waitFor(() => expect(onSaved).toHaveBeenCalledWith(undefined));
-  });
-});
-
-describe("onboarding screen", () => {
-  it("renders the optional step indicator", async () => {
-    const onboarding = { profile: null, banks: [bank], complete: false };
-    render(<Wrap api={fakeApi({ getOnboarding: vi.fn().mockResolvedValue(onboarding) })}><OnboardingScreen step={<Stepper current={1} />} /></Wrap>);
-    expect(await screen.findByRole("list", { name: "Progress" })).toBeTruthy();
-    expect(screen.getByRole("listitem", { current: "step" }).textContent).toContain("Set up");
-    expect(screen.getByRole("heading", { name: "Set up your details" })).toBeTruthy();
-  });
-
-  it("is one form: no AD banks card and no 'Add bank'", async () => {
-    render(<Wrap api={fakeApi({ getOnboarding: vi.fn().mockResolvedValue({ profile: null, banks: [], complete: false }) })}><OnboardingScreen /></Wrap>);
-    expect(await screen.findByLabelText("Which bank receives your foreign payments?")).toBeTruthy();
-    expect(screen.queryByText("Your AD banks")).toBeNull();
-    expect(screen.queryByText(/one pack per bank/)).toBeNull();
-    expect(screen.queryByRole("button", { name: "Add bank" })).toBeNull();
-  });
-});
-
-describe("stepper", () => {
-  it("marks the current step and the earlier ones as done", () => {
-    render(<Stepper current={2} />);
-    const items = within(screen.getByRole("list", { name: "Progress" })).getAllByRole("listitem");
-    expect(items.map((i) => i.getAttribute("aria-current"))).toEqual([null, "step", null]);
-    expect(items[0]!.textContent).toContain("Set up (done)");
-    expect(items[1]!.textContent).not.toContain("(done)");
-    expect(items[2]!.textContent).not.toContain("(done)");
-    expect(items[1]!.textContent).toContain("Upload invoices");
-    expect(items[2]!.textContent).toContain("Download your EDF pack");
   });
 });
 

@@ -20,7 +20,7 @@ export default async function ClientLayout({ children, params }: { children: Rea
         <p className="font-medium">Viewing {client.ownerName}&rsquo;s records (read-only)</p>
         <p className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
           <Link href={`${base}/months/${currentMonthIST()}`} className="text-accent underline">Months and packs</Link>
-          <Link href={`${base}/tracker`} className="text-accent underline">Tracker</Link>
+          <Link href={`${base}/months`} className="text-accent underline">Payments due</Link>
           <Link href="/ca" className="text-accent underline">All clients</Link>
         </p>
       </Alert>
