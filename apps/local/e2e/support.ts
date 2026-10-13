@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { expect, type BrowserContext, type Page, type Request } from "@playwright/test";
-import { makeInvoicePdf } from "./invoice-pdf";
+import { expect, type BrowserContext, type Locator, type Page, type Request } from "@playwright/test";
+import { INVOICE_LINES, makeInvoicePdf } from "./invoice-pdf";
 
 const DEEL_CSV = readFileSync(fileURLToPath(new URL("../../../packages/ingest/fixtures/deel/synthetic-transactions.csv", import.meta.url)));
 export const MONTH = "2026-09";
@@ -47,104 +47,150 @@ export function expectPrivate(seen: Privacy, origin: string): void {
   expect(seen.problems, "console errors and warnings").toEqual([]);
 }
 
-/** First run: "/" shows landing page; click "Prepare my EDF", fill in the profile and pick a bank, land on month. Then a reload shows "Continue your EDF". */
-export async function completeOnboarding(
+export const LANDING_HEADING = "Your export declaration forms, ready for the bank.";
+
+/** The guided flow's pane (its sticky action bar included). There is only ever one, so it is the scope for a flow's buttons: on a desktop the Home list beside it repeats titles. */
+export const flow = (page: Page): Locator => page.locator('section[aria-labelledby="flow-title"]');
+
+/** The `?task=` part of a flow's URL (the id is percent-encoded: `upload:2026-09` is `upload%3A2026-09`). */
+export const taskUrl = (id: string): RegExp => new RegExp(`/home\\?task=${encodeURIComponent(id).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`);
+
+/**
+ * First run, the way a person does it: landing page, "Get started", the Home hero, then the setup flow. The invoice
+ * (a real text-layer PDF, read by pdf.js under the strict CSP) fills in the details; "Is this you?" is confirmed;
+ * the bank is picked unless the invoice named one. Ends in the "Add your September invoices" upload flow, with the
+ * invoice already filed under its month.
+ */
+export async function completeSetup(
   page: Page,
-  opts: { bankLabel?: string; contactEmail?: string; branch?: string } = {},
+  opts: { bankLabel?: string; lines?: string[]; fileName?: string; onSummary?: (summary: Locator) => Promise<void> } = {},
 ): Promise<void> {
   const bankLabel = opts.bankLabel ?? "Kotak Mahindra Bank";
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Your export declaration forms, ready for the bank." })).toBeVisible();
-  await page.getByRole("link", { name: "Prepare my EDF" }).click();
-  await expect(page).toHaveURL(/\/onboarding$/);
-  await expect(page.getByRole("heading", { name: "Set up your details" })).toBeVisible();
-  await page.getByLabel("Legal name").fill("Jane Dev");
-  await page.getByLabel("Registered address").fill("12 MG Road, Bengaluru");
-  await page.getByLabel("GSTIN").fill("29ABCDE1234F1Z5");
-  await expect(page.getByLabel("PAN", { exact: true })).toHaveValue("ABCDE1234F"); // filled in from the GSTIN
-  await page.getByLabel("Which bank receives your foreign payments?").selectOption({ label: bankLabel });
-  await page.getByLabel("AD code").fill("6390001");
-  if (opts.contactEmail) {
-    await page.getByLabel("Branch or RM email (optional)").fill(opts.contactEmail);
-  }
-  if (opts.branch) {
-    await page.getByLabel("Branch name (optional)").fill(opts.branch);
-  }
-  await page.getByRole("button", { name: "Save and continue" }).click();
-  await expect(page).toHaveURL(/\/month\?m=\d{4}-\d{2}$/);
-  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  await expect(page.getByRole("heading", { name: LANDING_HEADING })).toBeVisible();
+  await page.getByRole("link", { name: "Get started" }).click();
+  await expect(page).toHaveURL(/\/home$/);
+  await expect(page.getByRole("heading", { name: "Let's get you set up" })).toBeVisible();
+  await page.getByRole("link", { name: "Let's go" }).click();
+  await expect(page).toHaveURL(taskUrl("setup"));
 
-  // A full reload: "/" shows the landing page with "Continue your EDF".
-  await page.goto("/");
-  await expect(page.getByRole("link", { name: "Continue your EDF" })).toBeVisible();
-}
+  const f = flow(page);
+  await expect(f.getByRole("heading", { name: "Drop an invoice" })).toBeVisible();
+  const pdf = await makeInvoicePdf(opts.lines ?? INVOICE_LINES);
+  await page.getByTestId("invoice-fill-input").setInputFiles({ name: opts.fileName ?? "jane-invoice.pdf", mimeType: "application/pdf", buffer: pdf });
+  await expect(f.getByRole("heading", { name: "Is this you?" })).toBeVisible();
+  await opts.onSummary?.(f);
+  await f.getByRole("button", { name: /^Looks right/ }).click();
 
-/** Sets the flow flag to "tracking", either through the nudge card or via page.evaluate. */
-export async function enterTracking(page: Page): Promise<void> {
-  const keepTrackingBtn = page.getByRole("button", { name: "Keep tracking in this browser" });
-  if (await keepTrackingBtn.isVisible().catch(() => false)) {
-    await keepTrackingBtn.click();
-    await expect(page).toHaveURL(/\/tracker$/);
+  if (!(await f.getByRole("heading", { name: "Your bank" }).isVisible().catch(() => false))) {
+    // The bank came from the invoice: "Looks right, save" saved everything.
   } else {
-    await page.addInitScript(() => {
-      localStorage.setItem("korra.flow", "tracking");
-    });
-    if (page.url() !== "about:blank") {
-      await page.evaluate(() => {
-        localStorage.setItem("korra.flow", "tracking");
-        window.dispatchEvent(new Event("storage"));
-      });
-    }
+    await f.getByRole("radio", { name: bankLabel }).click();
+    await f.getByRole("button", { name: "Save and continue" }).click();
   }
+  await expect(page).toHaveURL(taskUrl(`upload:${MONTH}`));
+  await expect(f.getByRole("heading", { name: "Add your September invoices" })).toBeVisible();
+  // Wait until the invoice has been read (a reload mid-read only requeues it, minutes later).
+  await expect(f.getByRole("button", { name: "Continue" })).toBeEnabled();
 }
 
-/** From a finished onboarding to a generated EDF pack in EDF mode: upload, review, fix address, generate. */
-export async function generateEdfPack(page: Page, origin: string): Promise<void> {
-  // Upload the Deel CSV and an invoice PDF (a real text-layer PDF, read by pdf.js in the browser).
-  await page.goto(`/month?m=${MONTH}`);
-  await page.getByTestId("file-input").setInputFiles([
-    { name: "synthetic-transactions.csv", mimeType: "text/csv", buffer: DEEL_CSV },
-    { name: "demo-invoice.pdf", mimeType: "application/pdf", buffer: await makeInvoicePdf() },
-  ]);
-  const invoice = page.getByRole("article", { name: "Invoice INV-2026-014" });
-  await expect(invoice).toBeVisible();
+/** In the upload flow: drop the Deel CSV, wait until it has been read, press Continue (to the review queue, as the invoice has things to check). */
+export async function uploadStatementAndContinue(page: Page): Promise<void> {
+  const f = flow(page);
+  await page.getByTestId("file-input").setInputFiles({ name: "synthetic-transactions.csv", mimeType: "text/csv", buffer: DEEL_CSV });
+  await expect(f.getByText("Read ✓")).toBeVisible();
+  const next = f.getByRole("button", { name: "Continue" });
+  await expect(next).toBeEnabled();
+  await next.click();
+  await expect(page).toHaveURL(taskUrl(`review:${MONTH}`));
+}
 
-  // Every locally extracted field is "Check this" (confidence 0.6): "I've checked these" confirms them in one click.
-  await expect(invoice.getByText("Check this").first()).toBeVisible();
-  await invoice.getByRole("button", { name: /I.ve checked these/ }).click();
-  await expect(invoice.getByText("Check this")).toHaveCount(0);
+const CLIENT_ADDRESS = "1 Main Street, New York, NY 10001";
+const queueCard = (page: Page) => flow(page).getByText(/ is missing its | read .* as the /);
 
-  // Editing a value still works.
-  await invoice.getByRole("button", { name: "Edit SAC code" }).click();
-  await invoice.getByLabel("SAC code", { exact: true }).fill("998314");
-  await invoice.getByRole("button", { name: "Save" }).click();
-  await expect(invoice.getByRole("button", { name: "Edit SAC code" })).toContainText("998314");
+/** One step of the review queue: a missing field is typed in and saved, a read one is confirmed. Waits for the next card (or the end). */
+async function reviewStep(page: Page): Promise<void> {
+  const f = flow(page);
+  const card = queueCard(page);
+  const before = await card.first().innerText();
+  const missing = /is missing its (.+)$/.exec(before);
+  if (missing) {
+    expect(missing[1], "the only field the local reader cannot find").toBe("Client address");
+    await f.getByLabel("Client address", { exact: true }).fill(CLIENT_ADDRESS);
+    await f.getByRole("button", { name: "Save", exact: true }).click();
+  } else {
+    await f.getByRole("button", { name: "Looks right", exact: true }).click();
+  }
+  await expect.poll(async () => ((await card.count()) === 0 ? "" : await card.first().innerText().catch(() => "")), { message: "the review queue moves on" }).not.toBe(before);
+}
 
-  // The local reader does not find a client address: it is typed in by hand (the pack is blocked until it is there).
-  await expect(page.getByText("Invoice INV-2026-014 is missing Client address.")).toBeVisible();
-  await invoice.getByRole("button", { name: "Edit Client address" }).click();
-  await invoice.getByLabel("Client address", { exact: true }).fill("1 Main Street, New York, NY 10001");
-  await invoice.getByRole("button", { name: "Save" }).click();
-  await expect(invoice.getByRole("button", { name: "Edit Client address" })).toContainText("1 Main Street");
+/** Walks the whole review queue to "All checked", then presses "Make my pack". */
+export async function finishReview(page: Page): Promise<void> {
+  const f = flow(page);
+  await expect(queueCard(page).first()).toBeVisible();
+  for (let i = 0; i < 40 && (await queueCard(page).count()) > 0; i++) await reviewStep(page);
+  await expect(f.getByText("All checked ✓")).toBeVisible();
+  await f.getByRole("button", { name: "Make my pack" }).click();
+  await expect(page).toHaveURL(/\/home\?task=generate%3A2026-09%3A/);
+}
 
-  // Generate the pack: four files, downloadable as blob: URLs.
-  await page.getByRole("button", { name: "Generate EDF pack" }).click();
-  await expect(page).toHaveURL(/\/pack\?id=[^&]+$/);
-  await expect(page.getByRole("heading", { name: /EDF pack for/ })).toBeVisible();
-  const downloads = page.getByRole("link", { name: "Download" });
+/** Make the pack and, on the Sign step, choose the paper route. Ends on the Send step with the pack's id in the URL. */
+export async function makePackSkipSignature(page: Page): Promise<string> {
+  const f = flow(page);
+  await f.getByRole("button", { name: "Make my pack" }).click();
+  await expect(f.getByRole("heading", { name: "Sign your pack" })).toBeVisible();
+  const packId = decodeURIComponent(/task=submit%3A([^&]+)$/.exec(page.url())![1]!);
+  await f.getByRole("button", { name: "My bank needs a wet signature" }).click();
+  await expect(f.getByRole("heading", { name: "Send your pack" })).toBeVisible();
+  return packId;
+}
+
+/** On the Send step: the four pack files, each a blob: download made in this browser. Returns their names. */
+export async function expectPackFiles(page: Page, origin: string): Promise<string[]> {
+  const f = flow(page);
+  await f.getByText("What's inside").click();
+  const downloads = f.getByRole("link", { name: /^Download .+/ });
   await expect(downloads).toHaveCount(4);
-  await expect(page.getByText("Korra does not submit anything for you")).toBeVisible(); // the guide's text, read from the local store
-  for (const href of await downloads.evaluateAll((as) => as.map((a) => (a as HTMLAnchorElement).href))) expect(href).toMatch(new RegExp(`^blob:${origin}/`));
+  const hrefs = await downloads.evaluateAll((as) => as.map((a) => (a as HTMLAnchorElement).href));
+  for (const href of hrefs) expect(href).toMatch(new RegExp(`^blob:${origin}/`));
+  return downloads.evaluateAll((as) => as.map((a) => (a as HTMLAnchorElement).download));
 }
 
-/** Full-mode extras: confirm matches and add a payment by hand. */
+/** "I've sent it" then "Mark as sent" (with a bank acknowledgement when `ack` is given), ending on the "All done" celebration. */
+export async function markSent(page: Page, ack?: Buffer): Promise<void> {
+  const f = flow(page);
+  await f.getByRole("button", { name: "I've sent it →" }).click();
+  await expect(f.getByRole("heading", { name: "Mark it as sent" })).toBeVisible();
+  if (ack) {
+    await f.getByTestId("file-input").setInputFiles({ name: "bank-ack.pdf", mimeType: "application/pdf", buffer: ack });
+    await expect(f.getByText("Uploaded", { exact: true })).toBeVisible();
+  }
+  await f.getByRole("button", { name: "Mark as sent" }).click();
+  await expect(f.getByRole("heading", { name: "All done" })).toBeVisible();
+  await expect(f.getByText("Sent!")).toBeVisible();
+}
+
+/** From a finished setup to a generated, wet-signature pack on its Send step: statement, review, make, skip signing. */
+export async function generateEdfPack(page: Page, origin: string): Promise<{ packId: string; fileNames: string[] }> {
+  await uploadStatementAndContinue(page);
+  await finishReview(page);
+  const packId = await makePackSkipSignature(page);
+  return { packId, fileNames: await expectPackFiles(page, origin) };
+}
+
+/** Opens a month's page (`/months?m=`) and one of its disclosures ("Documents (n)" or "Payments & matches"). */
+export async function openMonth(page: Page, disclosure?: RegExp | string): Promise<void> {
+  await page.goto(`/months?m=${MONTH}`);
+  await expect(page.getByRole("heading", { level: 1, name: "September 2026" })).toBeVisible();
+  if (disclosure) await page.locator("summary").filter({ hasText: disclosure }).click();
+}
+
+/** Full-mode extras: confirm the proposed match and add a payment by hand (both live under "Payments & matches"). */
 export async function addPaymentsAndMatches(page: Page): Promise<void> {
-  await page.goto(`/month?m=${MONTH}`);
-  // Confirm the proposed match.
+  await openMonth(page, "Payments & matches");
   await page.getByRole("button", { name: "Confirm", exact: true }).click();
   await expect(page.getByRole("heading", { name: /Confirmed \(1\)/ })).toBeVisible();
 
-  // A payment typed in by hand.
   await page.getByRole("button", { name: "Add payment by hand" }).click();
   const payForm = page.getByRole("form", { name: "Add payment by hand" });
   await payForm.getByLabel("Payer").fill("Hand Payer Ltd");

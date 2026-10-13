@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import ICAL from "ical.js";
 import JSZip from "jszip";
 import { expect, test, type Download, type Page } from "@playwright/test";
-import { addPaymentsAndMatches, completeOnboarding, enterTracking, expectPrivate, generateEdfPack, MONTH, watchPrivacy } from "./support";
+import { addPaymentsAndMatches, completeSetup, expectPrivate, flow, generateEdfPack, markSent, openMonth, watchPrivacy } from "./support";
 
 const SAFARI_UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1";
 const LEAD = "Your documents and details are stored only in this browser. Korra has no server copy. Back up regularly.";
@@ -18,6 +18,22 @@ const dateLabel = (iso: string) => {
 };
 const usd = (major: string) => `USD ${Number(major).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const todayIST = () => new Date(Date.now() + 330 * 60_000).toISOString().slice(0, 10);
+const mainNav = (page: Page) => page.getByRole("navigation", { name: "Main", exact: true });
+
+interface Shown { client: string; deadline: string; invoice: string; received: string; outstanding: string; status: string }
+
+/** An invoice's card under "Payments due" on the Months page, as the person reads it. */
+async function shownOnMonths(page: Page, invoiceNo: string): Promise<Shown> {
+  const card = page.getByRole("listitem").filter({ hasText: invoiceNo });
+  await expect(card).toHaveCount(1);
+  const title = (await card.locator("p").first().innerText()).split(" · ");
+  expect(title[0]).toBe(invoiceNo);
+  const deadline = /Due by (.+?) ·/.exec(await card.innerText())?.[1];
+  const [invoice, received, outstanding] = await card.locator("dd").allInnerTexts();
+  const status = await card.getByText(/^(Open|Part paid|Realised|Overdue)$/).innerText();
+  return { client: title.slice(1).join(" · "), deadline: deadline!, invoice: invoice!, received: received!, outstanding: outstanding!, status };
+}
+
 const stripStamp = (ics: string) => ics.split("\r\n").filter((l) => !l.startsWith("DTSTAMP:")).join("\r\n");
 
 test.describe("first-run privacy notice and the Privacy page", () => {
@@ -25,8 +41,8 @@ test.describe("first-run privacy notice and the Privacy page", () => {
     const origin = new URL(baseURL!).origin;
     const seen = await watchPrivacy(page, context);
 
-    await page.goto("/onboarding");
-    await expect(page.getByRole("heading", { name: "Set up your details" })).toBeVisible();
+    await page.goto("/home");
+    await expect(page.getByRole("heading", { name: "Let's get you set up" })).toBeVisible();
     await expect(notice(page)).toBeVisible();
     await expect(notice(page)).toContainText(LEAD);
     await expect(notice(page)).toContainText(DISCLAIMER);
@@ -34,7 +50,7 @@ test.describe("first-run privacy notice and the Privacy page", () => {
     await expect(notice(page)).toHaveCount(0);
 
     await page.reload();
-    await expect(page.getByRole("heading", { name: "Set up your details" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Let's get you set up" })).toBeVisible();
     await expect(notice(page)).toHaveCount(0);
 
     // The footer links to the permanent page.
@@ -51,9 +67,10 @@ test.describe("first-run privacy notice and the Privacy page", () => {
     await expect(article).not.toContainText(/usage counts|metrics|anonymous usage/i);
     await expect(page.getByText("Home Screen")).toHaveCount(0); // not Safari
 
-    // Settings has a Privacy section too (data is still empty: Settings needs onboarding data to render its forms).
-    await enterTracking(page);
-    await page.goto("/settings");
+    // Settings has a Privacy section too (reached through the tab bar).
+    await page.goto("/home");
+    await mainNav(page).getByRole("link", { name: "Settings" }).click();
+    await expect(page).toHaveURL(/\/settings$/);
     await expect(page.getByRole("region", { name: "Privacy" })).toBeVisible();
     await expect(page.getByRole("region", { name: "Privacy" }).getByRole("link", { name: /how your data is handled/i })).toHaveAttribute("href", "/privacy");
 
@@ -82,11 +99,11 @@ test("calendar and CA exports: built in the browser from the same data the scree
   const origin = new URL(baseURL!).origin;
   const seen = await watchPrivacy(page, context);
 
-  await completeOnboarding(page);
+  await completeSetup(page); // Kotak Mahindra Bank
   await generateEdfPack(page, origin);
 
   // What the pack screen offers, by content hash.
-  const links = page.getByRole("link", { name: "Download" });
+  const links = flow(page).getByRole("link", { name: /^Download .+/ });
   const shown: Record<string, string> = {};
   for (let i = 0; i < 4; i++) {
     const [d] = await Promise.all([page.waitForEvent("download"), links.nth(i).click()]);
@@ -94,16 +111,13 @@ test("calendar and CA exports: built in the browser from the same data the scree
   }
   expect(Object.keys(shown)).toHaveLength(4);
 
-  // Mark it submitted, then enter tracking and confirm matches + hand payment.
-  await page.getByRole("button", { name: "Mark as submitted" }).click();
-  await expect(page.getByText(/^Submitted \d/)).toBeVisible();
-
-  await enterTracking(page);
+  // Mark it sent, then confirm matches + a hand payment.
+  await markSent(page);
   await addPaymentsAndMatches(page);
 
   // Add a second invoice by hand that has no payment: it stays open, so it has real deadlines and alerts.
-  await page.goto(`/month?m=${MONTH}`);
-  await page.getByRole("button", { name: "Add invoice by hand" }).click();
+  await openMonth(page);
+  await page.getByRole("button", { name: "Add an invoice by hand" }).click();
   const form = page.getByRole("form", { name: "Add invoice by hand" });
   await form.getByLabel("Invoice number").fill("INV-2026-099");
   await form.getByLabel("Invoice date").fill("2026-09-20");
@@ -115,18 +129,15 @@ test("calendar and CA exports: built in the browser from the same data the scree
   await form.getByLabel("SAC code").fill("998314");
   await form.getByRole("button", { name: "Save invoice" }).click();
   await expect(form).toHaveCount(0);
-  await expect(page.getByRole("article", { name: "Invoice INV-2026-099" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Zenith Labs/ })).toBeVisible();
 
-  // The tracker, as the person sees it.
-  await page.goto("/tracker");
-  const screen: Record<string, string[]> = {};
-  for (const no of ["INV-2026-014", "INV-2026-099"]) {
-    const tr = page.getByRole("row", { name: new RegExp(no) });
-    await expect(tr.getByRole("cell")).toHaveCount(9);
-    screen[no] = await tr.getByRole("cell").allInnerTexts();
-  }
-  expect(screen["INV-2026-014"]![7]).toBe("Realised");
-  expect(screen["INV-2026-099"]![7]).toBe("Open");
+  // "Payments due" on the Months page, as the person sees it.
+  await mainNav(page).getByRole("link", { name: "Months" }).click();
+  await expect(page.getByRole("heading", { name: "Payments due" })).toBeVisible();
+  const screen: Record<string, Shown> = {};
+  for (const no of ["INV-2026-014", "INV-2026-099"]) screen[no] = await shownOnMonths(page, no);
+  expect(screen["INV-2026-014"]!.status).toBe("Realised");
+  expect(screen["INV-2026-099"]!.status).toBe("Open");
 
   /* ------------------------------- the calendar ------------------------------- */
   await page.goto("/settings");
@@ -153,8 +164,8 @@ test("calendar and CA exports: built in the browser from the same data the scree
   }));
   expect(events.every((e) => e.allDay)).toBe(true);
   expect(new Set(events.map((e) => e.uid)).size).toBe(events.length);
-  // The deadline on the tracker screen is the deadline in the calendar (9 months after 20 Sep 2026); the realised invoice has none.
-  expect(screen["INV-2026-099"]![6]).toBe(dateLabel("2027-06-20"));
+  // The deadline on the Months page is the deadline in the calendar (9 months after 20 Sep 2026); the realised invoice has none.
+  expect(screen["INV-2026-099"]!.deadline).toBe(dateLabel("2027-06-20"));
   const today = todayIST();
   // Alerts already in the past are left out, so they depend on the day this runs; the due date and the deadline always stay.
   const expected = [
@@ -194,7 +205,7 @@ test("calendar and CA exports: built in the browser from the same data the scree
   // The calendar inside is the calendar from Settings (only DTSTAMP, the moment it was made, differs).
   expect(stripStamp(await zip.file("korra-calendar.ics")!.async("string"))).toBe(stripStamp(ics));
 
-  // The tracker CSV has one row per tracker row, with the values the screen shows.
+  // The tracker CSV has one row per "Payments due" row, with the values the screen shows.
   const csvText = await zip.file("tracker.csv")!.async("string");
   expect(csvText.startsWith("\uFEFF")).toBe(true);
   const csv = csvText.slice(1).split("\r\n").filter(Boolean);
@@ -208,13 +219,12 @@ test("calendar and CA exports: built in the browser from the same data the scree
   expect(r99).toEqual(["INV-2026-099", "Zenith Labs", "2026-09-20", "2026-09", "USD", "1234.56", "0.00", "1234.56", "2027-06-20", "Open", ""]);
   for (const [no, r] of [["INV-2026-014", r14], ["INV-2026-099", r99]] as const) {
     const cells = screen[no]!;
-    expect(cells[1], no).toBe(r[1]);
-    expect(cells[2], no).toBe(dateLabel(r[2]!));
-    expect(cells[3], no).toBe(usd(r[5]!));
-    expect(cells[4], no).toBe(usd(r[6]!));
-    expect(cells[5], no).toBe(usd(r[7]!));
-    expect(cells[6], no).toBe(dateLabel(r[8]!));
-    expect(cells[7], no).toBe(r[9]);
+    expect(cells.client, no).toBe(r[1]);
+    expect(cells.invoice, no).toBe(usd(r[5]!));
+    expect(cells.received, no).toBe(usd(r[6]!));
+    expect(cells.outstanding, no).toBe(usd(r[7]!));
+    expect(cells.deadline, no).toBe(dateLabel(r[8]!));
+    expect(cells.status, no).toBe(r[9]);
   }
 
   // README: what it is, that it is a local copy, and where things are.

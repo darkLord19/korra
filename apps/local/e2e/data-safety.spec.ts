@@ -4,17 +4,26 @@ import { gzipSync } from "node:zlib";
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { readBackup, tamper } from "./backup-file";
 import { makeInvoicePdf } from "./invoice-pdf";
-import { addPaymentsAndMatches, completeOnboarding, enterTracking, expectPrivate, generateEdfPack, MONTH, watchPrivacy } from "./support";
+import { addPaymentsAndMatches, completeSetup, expectPrivate, finishReview, flow, generateEdfPack, LANDING_HEADING, makePackSkipSignature, markSent, openMonth, watchPrivacy } from "./support";
 
 const SAFARI_UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1";
 
 const backupPanel = (page: Page) => page.getByRole("region", { name: "Back up and restore" });
 const dataPanel = (page: Page) => page.getByRole("region", { name: "Your data" });
-const reminder = (page: Page) => page.getByRole("region", { name: "Backup reminder" });
 const storageWarning = (page: Page) => page.getByRole("region", { name: "Storage warning" });
+/** The Home list's row for the backup task. It only exists while a backup is due. */
+const backupRow = (page: Page) => page.locator('a[href="/home?task=backup"]');
+const mainNav = (page: Page) => page.getByRole("navigation", { name: "Main", exact: true });
 
-/** Gives a "nothing appears" assertion a moment to be wrong: the reminder is decided right after the screen loads. */
+/** Gives a "nothing appears" assertion a moment to be wrong: the list is decided right after the screen loads. */
 const settle = (page: Page) => page.waitForTimeout(500);
+
+/** Home once its list has loaded (the greeting is part of the list, so the backup row would be there by now). */
+async function openHome(page: Page): Promise<void> {
+  await page.goto("/home");
+  await expect(page.getByText(/^Hey 👋/)).toBeVisible();
+  await settle(page);
+}
 
 /** Make the browser's answer to persist()/persisted() deterministic (Chromium may grant or deny on its own). */
 async function stubPersist(page: Page, answer: boolean): Promise<void> {
@@ -22,6 +31,14 @@ async function stubPersist(page: Page, answer: boolean): Promise<void> {
     Object.defineProperty(StorageManager.prototype, "persisted", { value: async () => persisted, configurable: true });
     Object.defineProperty(StorageManager.prototype, "persist", { value: async () => persisted, configurable: true });
   }, answer);
+}
+
+/** The Months page once it has loaded, with no trace of the invoice (a fresh start). */
+async function expectNoInvoice(page: Page): Promise<void> {
+  await page.goto("/months");
+  await expect(page.getByRole("heading", { level: 1, name: "Months" })).toBeVisible();
+  await expect(page.getByText("No invoices").first()).toBeVisible(); // the cards have loaded
+  await expect(page.getByText("INV-2026-014")).toHaveCount(0);
 }
 
 /** Settings > Back up now; returns the downloaded file's path. */
@@ -38,41 +55,42 @@ async function backUpFromSettings(page: Page, saveTo: string): Promise<string> {
 async function content(main: Locator): Promise<string> {
   return main.evaluate((el) => {
     const copy = el.cloneNode(true) as HTMLElement;
-    copy.querySelectorAll('section[aria-label="Notice"], section[aria-label="Storage warning"], section[aria-label="Backup reminder"], section[aria-label="Backup error"]').forEach((n) => n.remove());
+    copy.querySelectorAll('section[aria-label="Notice"], section[aria-label="Storage warning"]').forEach((n) => n.remove());
     return (copy.textContent ?? "").replace(/\s+/g, " ").trim();
   });
 }
 
 interface Snapshot {
   month: string;
-  tracker: string;
+  months: string;
   pack: string;
   files: { name: string; sha256: string }[];
 }
 
-/** What the person sees: the month, the tracker, the pack page and every downloadable pack file (by content hash). */
-async function snapshot(page: Page, packUrl: string): Promise<Snapshot> {
+/** What the person sees: the month, the Months page with its "Payments due", the sent pack and every downloadable pack file (by content hash). */
+async function snapshot(page: Page, packId: string): Promise<Snapshot> {
   const main = page.locator("main");
-  await page.goto(`/month?m=${MONTH}`);
-  await expect(page.getByRole("article", { name: "Invoice INV-2026-014" })).toBeVisible();
+  await openMonth(page, /^Documents/);
+  await expect(page.getByRole("button", { name: /Acme Corp/ })).toBeVisible();
   await expect(page.getByText("Bank acknowledgement")).toBeVisible();
   const month = await content(main);
 
-  await page.goto("/tracker");
-  await expect(page.getByRole("row", { name: /INV-2026-014/ })).toContainText("Realised");
-  const tracker = await content(main);
+  await page.goto("/months");
+  await expect(page.getByRole("heading", { name: "Payments due" })).toBeVisible();
+  await expect(page.getByRole("listitem").filter({ hasText: "INV-2026-014" }).getByText("Realised", { exact: true })).toBeVisible();
+  const months = await content(main);
 
-  await page.goto(packUrl);
-  const downloads = page.getByRole("link", { name: "Download" });
+  await page.goto(`/pack?id=${encodeURIComponent(packId)}`);
+  const downloads = page.getByRole("link", { name: /^Download .+/ });
   await expect(downloads).toHaveCount(4);
-  await expect(page.getByRole("heading", { name: "3. Submit" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "EDF pack for September 2026" })).toBeVisible();
   const pack = await content(main);
   const files: Snapshot["files"] = [];
   for (let i = 0; i < 4; i++) {
     const [d] = await Promise.all([page.waitForEvent("download"), downloads.nth(i).click()]);
     files.push({ name: d.suggestedFilename(), sha256: createHash("sha256").update(readFileSync((await d.path())!)).digest("hex") });
   }
-  return { month, tracker, pack, files };
+  return { month, months, pack, files };
 }
 
 test.describe("backup, restore and delete", () => {
@@ -81,38 +99,21 @@ test.describe("backup, restore and delete", () => {
     const origin = new URL(baseURL!).origin;
     const seen = await watchPrivacy(page, context);
 
-    await completeOnboarding(page);
+    await completeSetup(page);
+    const { packId } = await generateEdfPack(page, origin);
 
-    // Storage warning is absent before tracking
-    await page.goto(`/month?m=${MONTH}`);
-    await expect(storageWarning(page)).toHaveCount(0);
+    // Record the submission with an acknowledgement; then the sent celebration offers a copy of the data.
+    await markSent(page, await makeInvoicePdf(["Acknowledged by the bank"]));
+    await expect(flow(page).getByText("Keep a copy of your data")).toBeVisible();
 
-    await generateEdfPack(page, origin);
-    const packUrl = new URL(page.url()).pathname + new URL(page.url()).search;
+    // The pack is in, so a backup is due: Home lists it as a task.
+    await page.getByRole("navigation", { name: "Main", exact: true }).getByRole("link", { name: "Home" }).click();
+    await expect(backupRow(page)).toBeVisible();
 
-    // Storage warning is present on the nudge card
-    await expect(storageWarning(page)).toBeVisible();
-
-    // Enter tracking mode
-    await enterTracking(page);
-
-    // A pack was just generated: the reminder appears in tracking mode, once.
-    await expect(reminder(page)).toBeVisible();
-    await expect(reminder(page).getByText("Your pack is ready.")).toBeVisible();
-    await reminder(page).getByRole("button", { name: "Later" }).click();
-    await expect(reminder(page)).toHaveCount(0);
-
-    // Add match and hand payment in full mode
+    // Add match and hand payment
     await addPaymentsAndMatches(page);
 
-    // Record the submission with an acknowledgement, like the main flow does.
-    await page.goto(packUrl);
-    await page.getByTestId("file-input").setInputFiles({ name: "bank-ack.pdf", mimeType: "application/pdf", buffer: await makeInvoicePdf(["Acknowledged by the bank"]) });
-    await expect(page.getByText("Uploaded", { exact: true })).toBeVisible();
-    await page.getByRole("button", { name: "Mark as submitted" }).click();
-    await expect(page.getByText(/^Submitted \d/)).toBeVisible();
-
-    const before = await snapshot(page, packUrl);
+    const before = await snapshot(page, packId);
     expect(before.files.map((f) => f.name)).toHaveLength(4);
 
     // Back up now: a .korra file, and the settings remember when.
@@ -134,17 +135,15 @@ test.describe("backup, restore and delete", () => {
     await dialog.getByLabel("Type DELETE to confirm").fill("DELETE");
     await dialog.getByRole("button", { name: "Delete everything" }).click();
     await expect(page).toHaveURL(/\/$/);
-    await expect(page.getByRole("heading", { name: "Your export declaration forms, ready for the bank." })).toBeVisible();
-    await page.getByRole("link", { name: "Prepare my EDF" }).click();
-    await expect(page).toHaveURL(/\/onboarding$/);
-    await expect(page.getByRole("heading", { name: "Set up your details" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: LANDING_HEADING })).toBeVisible();
+    await page.getByRole("link", { name: "Get started" }).click();
+    await expect(page).toHaveURL(/\/home$/);
+    await expect(page.getByRole("heading", { name: "Let's get you set up" })).toBeVisible(); // first run again
     expect(await page.evaluate(() => localStorage.getItem("korra.lastBackupAt"))).toBeNull();
-    await expect(page.getByLabel("Legal name")).toHaveValue("");
-    await enterTracking(page);
-    await page.goto("/tracker");
-    await expect(page.getByRole("row", { name: /INV-2026-014/ })).toHaveCount(0);
+    await expectNoInvoice(page);
     await page.goto("/settings");
     await expect(backupPanel(page).getByText("Last backup: never")).toBeVisible();
+    await expect(page.getByLabel("Legal name")).toHaveValue("");
 
     // Restore the file: choosing it asks first, and nothing changes until the person agrees.
     await backupPanel(page).getByLabel("Restore from a backup file").setInputFiles(fileA);
@@ -153,18 +152,17 @@ test.describe("backup, restore and delete", () => {
     await expect(confirm).toContainText("replaces everything");
     await confirm.getByRole("button", { name: "Cancel" }).click();
     await expect(confirm).toHaveCount(0);
-    await page.goto("/tracker");
-    await expect(page.getByRole("row", { name: /INV-2026-014/ })).toHaveCount(0); // still empty after Cancel
+    await expectNoInvoice(page); // still empty after Cancel
     await page.goto("/settings");
     await backupPanel(page).getByLabel("Restore from a backup file").setInputFiles(fileA);
     await page.getByRole("alertdialog", { name: "Replace all your data with this backup?" }).getByRole("button", { name: "Replace my data" }).click();
-    await expect(page).toHaveURL(/\/month\?m=\d{4}-\d{2}$/);
+    await expect(page).toHaveURL(/\/home$/);
     await expect(page.getByText("Your backup was restored.")).toBeVisible();
 
     // Everything the person saw before is back, byte for byte where there are bytes.
-    const after = await snapshot(page, packUrl);
+    const after = await snapshot(page, packId);
     expect(after.month).toBe(before.month);
-    expect(after.tracker).toBe(before.tracker);
+    expect(after.months).toBe(before.months);
     expect(after.pack).toBe(before.pack);
     expect(after.files).toEqual(before.files);
 
@@ -186,8 +184,7 @@ test.describe("backup, restore and delete", () => {
     test.setTimeout(240_000);
     const origin = new URL(baseURL!).origin;
     const seen = await watchPrivacy(page, context);
-    await completeOnboarding(page);
-    await enterTracking(page);
+    await completeSetup(page);
     const good = await backUpFromSettings(page, testInfo.outputPath("good.korra"));
 
     const bad: Record<string, { file: Buffer | string; message: RegExp }> = {
@@ -221,12 +218,12 @@ test.describe("backup, restore and delete", () => {
     }
 
     // Nothing was touched: not even after a full reload, and the app keeps working.
-    await page.goto("/month");
-    await expect(page).toHaveURL(/\/month\?m=\d{4}-\d{2}$/);
+    await page.goto("/months");
+    await expect(page.getByRole("heading", { level: 1, name: "Months" })).toBeVisible();
     await page.goto("/settings");
-    await expect(page.getByLabel("Legal name")).toHaveValue("Jane Dev");
+    await expect(page.getByLabel("Legal name")).toHaveValue("JANE DEV CONSULTING");
+    await expect(page.getByLabel("GSTIN")).toHaveValue("29ABCDE1234F1Z5");
     await expect(page.getByLabel("Which bank receives your foreign payments?")).toHaveValue("kotak");
-    await expect(page.getByLabel("AD code")).toHaveValue("6390001");
     expectPrivate(seen, origin);
   });
 
@@ -234,12 +231,10 @@ test.describe("backup, restore and delete", () => {
     test.setTimeout(240_000);
     const origin = new URL(baseURL!).origin;
     const seen = await watchPrivacy(page, context);
-    await completeOnboarding(page);
-    await enterTracking(page);
+    await completeSetup(page);
     const good = await backUpFromSettings(page, testInfo.outputPath("good.korra"));
 
     const other = await context.newPage();
-    await enterTracking(other);
     await other.goto("/settings");
     await expect(other.getByRole("heading", { name: "Settings" })).toBeVisible();
 
@@ -255,10 +250,10 @@ test.describe("backup, restore and delete", () => {
     await expect(dataPanel(page).getByRole("alert")).toContainText("Korra is open in another tab");
 
     // Both tabs still have their data; the page was not left in a "working" state.
-    await expect(page.getByLabel("Legal name")).toHaveValue("Jane Dev");
+    await expect(page.getByLabel("Legal name")).toHaveValue("JANE DEV CONSULTING");
     await other.close();
     await page.reload();
-    await expect(page.getByLabel("Legal name")).toHaveValue("Jane Dev");
+    await expect(page.getByLabel("Legal name")).toHaveValue("JANE DEV CONSULTING");
     expectPrivate(seen, origin);
   });
 });
@@ -267,7 +262,6 @@ test.describe("persistent storage", () => {
   test("Settings and the warning follow whatever this browser answers", async ({ page, context, baseURL }) => {
     const origin = new URL(baseURL!).origin;
     const seen = await watchPrivacy(page, context);
-    await enterTracking(page);
     await page.goto("/settings");
     await expect(backupPanel(page).getByText(/^Storage: (protected|not protected)$/)).toBeVisible();
     const persisted = await page.evaluate(() => navigator.storage.persisted());
@@ -278,7 +272,6 @@ test.describe("persistent storage", () => {
 
   test("granted: shown as protected, no warning", async ({ page }) => {
     await stubPersist(page, true);
-    await enterTracking(page);
     await page.goto("/settings");
     await expect(backupPanel(page).getByText("Storage: protected")).toBeVisible();
     await expect(storageWarning(page)).toHaveCount(0);
@@ -286,9 +279,8 @@ test.describe("persistent storage", () => {
 
   test("denied: a warning on every page that cannot be dismissed, linking to Settings", async ({ page }) => {
     await stubPersist(page, false);
-    await enterTracking(page);
-    await page.goto("/month");
-    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    await page.goto("/months");
+    await expect(page.getByRole("heading", { level: 1, name: "Months" })).toBeVisible();
     const warning = storageWarning(page);
     await expect(warning).toBeVisible();
     await expect(warning).toContainText("Back up regularly");
@@ -307,104 +299,103 @@ test.describe("persistent storage", () => {
     test.use({ userAgent: SAFARI_UA });
     test("the warning recommends Add to Home Screen or a desktop browser", async ({ page }) => {
       await stubPersist(page, false);
-      await enterTracking(page);
-      await page.goto("/month");
+        await page.goto("/months");
       await expect(storageWarning(page)).toContainText("Add Korra to your Home Screen");
       await expect(storageWarning(page)).toContainText("desktop browser");
     });
     test("and says nothing about it when storage is protected", async ({ page }) => {
       await stubPersist(page, true);
-      await enterTracking(page);
-      await page.goto("/month");
-      await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+        await page.goto("/months");
+      await expect(page.getByRole("heading", { level: 1, name: "Months" })).toBeVisible();
       await expect(page.getByText("Home Screen")).toHaveCount(0);
     });
   });
 });
 
-test.describe("backup reminders", () => {
-  test("30 days: never backed up, 31 days old and 5 days old; once per session; none without data", async ({ page, context, baseURL }) => {
-    test.setTimeout(240_000);
+test.describe("the Home backup task", () => {
+  test("only once a pack exists, due when the last backup is a week old or unknown, and taking it records the time", async ({ page, context, baseURL }) => {
+    test.setTimeout(300_000);
     const origin = new URL(baseURL!).origin;
     const seen = await watchPrivacy(page, context);
 
-    // First run: nothing to lose yet, so nothing to remind about.
-    await page.goto("/onboarding");
-    await expect(page.getByRole("heading", { name: "Set up your details" })).toBeVisible();
+    // First run: nothing to lose yet, so nothing to back up.
+    await page.goto("/home");
+    await expect(page.getByRole("heading", { name: "Let's get you set up" })).toBeVisible();
     await settle(page);
-    await expect(reminder(page)).toHaveCount(0);
+    await expect(backupRow(page)).toHaveCount(0);
 
-    await completeOnboarding(page);
-    await enterTracking(page);
-    await page.goto("/month");
-    await expect(reminder(page)).toBeVisible();
-    await expect(reminder(page)).toContainText("Back up your data");
-    await expect(reminder(page)).toContainText("not backed up yet");
-
-    // "Later" dismisses it, and a reload in the same session does not bring it back.
-    await reminder(page).getByRole("button", { name: "Later" }).click();
-    await expect(reminder(page)).toHaveCount(0);
-    await page.reload();
-    await expect(page).toHaveURL(/\/month\?m=\d{4}-\d{2}$/);
-    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    // Details and an invoice are not a pack yet: still no task.
+    await completeSetup(page);
+    await mainNav(page).getByRole("link", { name: "Home" }).click();
+    await expect(page).toHaveURL(/\/home$/);
+    await expect(page.getByText(/^Hey 👋/)).toBeVisible();
     await settle(page);
-    await expect(reminder(page)).toHaveCount(0);
+    await expect(backupRow(page)).toHaveCount(0);
 
-    const newSession = async (lastBackupDaysAgo: number) => {
-      await page.evaluate((days) => {
-        localStorage.setItem("korra.lastBackupAt", String(Date.now() - days * 86_400_000));
-        localStorage.setItem("korra.flow", "tracking");
-        sessionStorage.clear();
-      }, lastBackupDaysAgo);
-      await page.goto("/month");
-      await expect(page).toHaveURL(/\/month\?m=\d{4}-\d{2}$/);
-      await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-      await settle(page);
+    // A pack made in this session adds the task straight away (no reload), and sending it offers a backup too.
+    // (the list catches up with the invoice being read within a poll or two, so wait for the quick checks to show)
+    await page.getByRole("link", { name: "Let's go" }).and(page.locator('a[href="/home?task=review%3A2026-09"]')).click();
+    await expect(page).toHaveURL(/\/home\?task=review%3A/);
+    await finishReview(page);
+    await makePackSkipSignature(page);
+    await markSent(page);
+    await expect(flow(page).getByText("Keep a copy of your data")).toBeVisible();
+    await expect(flow(page).getByRole("button", { name: "Download a backup" })).toBeVisible();
+    await mainNav(page).getByRole("link", { name: "Home" }).click();
+    await expect(page).toHaveURL(/\/home$/);
+    await expect(backupRow(page)).toBeVisible();
+    await expect(backupRow(page)).toContainText("Back up your data");
+
+    // The week rule: 5 days is recent enough, 8 days is not, and a garbage timestamp means "never".
+    const setLastBackup = async (value: string) => {
+      await page.evaluate((v) => localStorage.setItem("korra.lastBackupAt", v), value);
+      await openHome(page);
     };
+    await setLastBackup(String(Date.now() - 5 * 86_400_000));
+    await expect(backupRow(page)).toHaveCount(0);
+    await setLastBackup(String(Date.now() - 8 * 86_400_000));
+    await expect(backupRow(page)).toBeVisible();
+    await setLastBackup("yesterday");
+    await expect(backupRow(page)).toBeVisible();
 
-    await newSession(5);
-    await expect(reminder(page)).toHaveCount(0);
-
-    await newSession(31);
-    await expect(reminder(page)).toBeVisible();
-    await expect(reminder(page)).toContainText("31 days ago");
-
-    // "Back up now" in the reminder downloads a file, records the time and removes the reminder.
-    const [download] = await Promise.all([page.waitForEvent("download"), reminder(page).getByRole("button", { name: "Back up now" }).click()]);
+    // Taking it: a .korra file, the time recorded, the task gone, and Home moves on without ever saying "already done".
+    await backupRow(page).click();
+    await expect(page).toHaveURL(/\/home\?task=backup$/);
+    await expect(flow(page).getByRole("heading", { name: "Back up your data" })).toBeVisible();
+    await page.evaluate(() => {
+      const w = window as unknown as { __alreadyDone: boolean };
+      w.__alreadyDone = false;
+      new MutationObserver(() => { if (document.body.textContent?.includes("already done")) w.__alreadyDone = true; })
+        .observe(document.body, { subtree: true, childList: true, characterData: true });
+    });
+    const [download] = await Promise.all([page.waitForEvent("download"), flow(page).getByRole("button", { name: "Download a backup" }).click()]);
     expect(download.suggestedFilename()).toMatch(/^korra-backup-\d{4}-\d{2}-\d{2}\.korra$/);
-    await expect(reminder(page)).toHaveCount(0);
+    await expect(page).not.toHaveURL(/task=backup/);
+    await expect(backupRow(page)).toHaveCount(0);
     const stored = Number(await page.evaluate(() => localStorage.getItem("korra.lastBackupAt")));
     expect(Date.now() - stored).toBeLessThan(60_000);
-
-    // A garbage timestamp means "never".
-    await page.evaluate(() => {
-      localStorage.setItem("korra.lastBackupAt", "yesterday");
-      localStorage.setItem("korra.flow", "tracking");
-      sessionStorage.clear();
-    });
-    await page.goto("/month");
-    await expect(reminder(page)).toContainText("not backed up yet");
+    expect(await page.evaluate(() => (window as unknown as { __alreadyDone: boolean }).__alreadyDone), "the pane never flashed 'That's already done'").toBe(false);
 
     expectPrivate(seen, origin);
   });
 
-  test("a generated pack raises the reminder, once per session", async ({ page, context, baseURL }) => {
-    test.setTimeout(240_000);
+  test("the card after a pack is sent backs up too, and the old reminder banner is gone", async ({ page, context, baseURL }) => {
+    test.setTimeout(300_000);
     const origin = new URL(baseURL!).origin;
     const seen = await watchPrivacy(page, context);
-    await completeOnboarding(page);
-    await enterTracking(page);
-    // Pretend the person backed up recently, so only the pack can raise the reminder.
-    await page.evaluate(() => { localStorage.setItem("korra.lastBackupAt", String(Date.now())); sessionStorage.clear(); });
-    await page.goto(`/month?m=${MONTH}`);
-    await settle(page);
-    await expect(reminder(page)).toHaveCount(0);
-
+    await completeSetup(page);
     await generateEdfPack(page, origin);
-    await expect(reminder(page)).toBeVisible();
-    await expect(reminder(page)).toContainText("Your pack is ready.");
-    await reminder(page).getByRole("button", { name: "Later" }).click();
-    await expect(reminder(page)).toHaveCount(0);
+    await markSent(page);
+    const [download] = await Promise.all([page.waitForEvent("download"), flow(page).getByRole("button", { name: "Download a backup" }).click()]);
+    expect(download.suggestedFilename()).toMatch(/^korra-backup-\d{4}-\d{2}-\d{2}\.korra$/);
+    await expect(flow(page).getByText(/^Saved korra-backup-/)).toBeVisible();
+    const stored = Number(await page.evaluate(() => localStorage.getItem("korra.lastBackupAt")));
+    expect(Date.now() - stored).toBeLessThan(60_000);
+
+    // No banner above the page asks for a backup any more: that is the Home task's job.
+    await expect(page.getByRole("region", { name: "Backup reminder" })).toHaveCount(0);
+    await openHome(page);
+    await expect(page.getByRole("region", { name: "Backup reminder" })).toHaveCount(0);
     expectPrivate(seen, origin);
   });
 });
