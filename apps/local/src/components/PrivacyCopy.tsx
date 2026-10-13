@@ -38,7 +38,7 @@ export function PrivacyNotice() {
   useEffect(() => setVisible(!isPrivacyNoticeDismissed()), []);
   if (!visible) return null;
   return (
-    <section aria-label="Privacy notice" className="mx-auto w-full max-w-5xl px-4 pt-6">
+    <section aria-label="Privacy notice" className="mx-auto w-full max-w-6xl px-4 pt-6">
       <Alert tone="info" title="Your data stays on this device">
         <p>{PRIVACY_LEAD}</p>
         <p className="mt-1">{DISCLAIMER}</p>

@@ -8,11 +8,12 @@ import { serverApi } from "./server-api";
 const WebLink = (props: NavLinkProps) => <NextLink {...props} />;
 
 export const webHrefs: KorraNav["hrefs"] = {
-  home: () => "/",
-  onboarding: () => "/onboarding",
+  landing: () => "/",
+  home: () => "/home",
+  task: (id) => `/home?task=${encodeURIComponent(id)}`,
+  months: () => "/months",
   month: (month) => `/months/${month}`,
   pack: (packId) => `/packs/${packId}`,
-  tracker: () => "/tracker",
   settings: () => "/settings",
 };
 
@@ -36,9 +37,10 @@ export function ClientNav({ ownerId, children }: { ownerId: string; children: Re
       hrefs: {
         ...parent.hrefs,
         home: () => base,
+        task: () => base,
+        months: () => `${base}/months`,
         month: (month) => `${base}/months/${month}`,
         pack: (packId) => `${base}/packs/${packId}`,
-        tracker: () => `${base}/tracker`,
       },
     }),
     [parent, base],

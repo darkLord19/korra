@@ -76,11 +76,12 @@ export const testNav: KorraNav = {
   push: () => undefined,
   refresh: () => undefined,
   hrefs: {
-    home: () => "/",
-    onboarding: () => "/onboarding",
+    landing: () => "/",
+    home: () => "/home",
+    task: (id) => `/home?task=${encodeURIComponent(id)}`,
+    months: () => "/months",
     month: (m) => `/months/${m}`,
     pack: (id) => `/packs/${id}`,
-    tracker: () => "/tracker",
     settings: () => "/settings",
   },
 };

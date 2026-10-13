@@ -43,7 +43,7 @@ export function MonthRoute() {
     api.getOnboarding().then(
       async (ob) => {
         if (!live) return;
-        if (!ob.complete) return router.replace(nav.hrefs.onboarding());
+        if (!ob.complete) return router.replace("/onboarding");
         // An invoice that filled in the setup form is filed first, so the page's first load already lists it (under its own month).
         const filedIn = await fileHeldInvoice(api);
         if (!live) return;
@@ -58,6 +58,14 @@ export function MonthRoute() {
   if (error) return <Alert tone="danger">{error}</Alert>;
   if (month === null || !ready) return <Loading />;
   return <MonthScreen key={month} month={month} mode={flow === "tracking" ? "full" : "edf"} {...(flow === "tracking" ? {} : { step: <Stepper current={2} /> })} />;
+}
+
+/** `/home`: for now the current month (a stand-in until Home exists). */
+export const HomeRoute = () => <MonthRoute />;
+
+/** `/months`: one month with `?m=YYYY-MM`, otherwise the tracker (a stand-in until the months index exists). */
+export function MonthsRoute() {
+  return useSearchParams().get("m") === null ? <TrackerRoute /> : <MonthRoute />;
 }
 
 /** `/pack?id=...` */

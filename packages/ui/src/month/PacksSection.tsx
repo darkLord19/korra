@@ -19,7 +19,7 @@ function describe(b: BlockerWire, invoices: InvoiceWire[], nav: KorraNav): Item 
     case "document_pending": return { text: "A document is still being read. Wait a moment, then check again.", href: "#documents", link: "See documents" };
     case "missing_field":
       return b.entity === "exporter"
-        ? { text: `Your profile is missing ${fieldLabel(b.field)}.`, href: nav.hrefs.onboarding(), link: "Open your details" }
+        ? { text: `Your profile is missing ${fieldLabel(b.field)}.`, href: nav.hrefs.settings(), link: "Open settings" }
         : { text: `Invoice ${inv(b.id)} is missing ${fieldLabel(b.field)}.`, href: `#${invoiceAnchor(b.id, b.field)}`, link: `Add ${fieldLabel(b.field)}` };
     case "flagged_field":
       return { text: `Check ${fieldLabel(b.field)} on invoice ${inv(b.id)}: Korra was only ${Math.round(b.confidence * 100)}% sure. Confirm or correct it.`, href: `#${invoiceAnchor(b.id, b.field)}`, link: `Go to ${fieldLabel(b.field)}` };

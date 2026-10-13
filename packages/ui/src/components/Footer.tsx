@@ -2,7 +2,7 @@ export const DISCLAIMER = "Korra prepares documents; you or your CA submit them.
 
 export function Footer() {
   return (
-    <footer className="mx-auto w-full max-w-5xl px-4 py-8 text-xs text-muted">
+    <footer className="mx-auto w-full max-w-6xl px-4 py-8 text-xs text-muted">
       <p>{DISCLAIMER}</p>
     </footer>
   );

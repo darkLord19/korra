@@ -9,49 +9,56 @@
  */
 @source "./";
 
+/* "Bright & friendly": white canvas, violet accent. */
 :root {
-  --bg: #f4f6f5;
+  --bg: #ffffff;
   --surface: #ffffff;
-  --ink: #17211e;
-  --muted: #55625e;
-  --line: #d9dfdc;
-  --accent: #1d5c52;
+  --surface-soft: #f5f3ff;
+  --ink: #1b1740;
+  --muted: #6a6790;
+  --line: #ece9ff;
+  --accent: #6c5ce7;
+  --accent-2: #a66cff;
   --accent-ink: #ffffff;
-  --accent-soft: #e2efec;
-  --flag: #8a4b00;
-  --flag-soft: #fff1d6;
-  --danger: #a32a2a;
-  --danger-soft: #fde8e6;
-  --ok: #1f6b3a;
-  --ok-soft: #e1f3e6;
+  --accent-soft: #f0edff;
+  --flag: #9a5b00;
+  --flag-soft: #fff3cc;
+  --danger: #d2462a;
+  --danger-soft: #ffe3dc;
+  --ok: #1f8a5b;
+  --ok-soft: #dcf7ea;
   color-scheme: light dark;
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #10171a;
-    --surface: #182024;
-    --ink: #e6ecea;
-    --muted: #9eaca7;
-    --line: #2b373b;
-    --accent: #6cc0b2;
-    --accent-ink: #0b1613;
-    --accent-soft: #1b3330;
-    --flag: #f2b45c;
-    --flag-soft: #3a2b12;
-    --danger: #f19a94;
-    --danger-soft: #3b1c1b;
-    --ok: #86d29b;
-    --ok-soft: #1a3322;
+    --bg: #120f24;
+    --surface: #1b1735;
+    --surface-soft: #231e44;
+    --ink: #ecebff;
+    --muted: #a5a2c8;
+    --line: #2e2856;
+    --accent: #a99bff;
+    --accent-2: #c39bff;
+    --accent-ink: #120f24;
+    --accent-soft: #2a2452;
+    --flag: #f2c45c;
+    --flag-soft: #3a2f12;
+    --danger: #ff9d88;
+    --danger-soft: #3d1d17;
+    --ok: #7fe0b0;
+    --ok-soft: #173327;
   }
 }
 
 @theme inline {
   --color-bg: var(--bg);
   --color-surface: var(--surface);
+  --color-surface-soft: var(--surface-soft);
   --color-ink: var(--ink);
   --color-muted: var(--muted);
   --color-line: var(--line);
   --color-accent: var(--accent);
+  --color-accent-2: var(--accent-2);
   --color-accent-ink: var(--accent-ink);
   --color-accent-soft: var(--accent-soft);
   --color-flag: var(--flag);
@@ -60,8 +67,8 @@
   --color-danger-soft: var(--danger-soft);
   --color-ok: var(--ok);
   --color-ok-soft: var(--ok-soft);
-  --font-serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  /* System fonts only (no web fonts: the strict CSP in apps/local must keep passing). */
+  --font-sans: ui-rounded, "SF Pro Rounded", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
 
 body {
@@ -69,10 +76,31 @@ body {
   color: var(--ink);
   font-family: var(--font-sans);
 }
-h1, h2 { font-family: var(--font-serif); letter-spacing: -0.01em; }
+h1, h2 { font-weight: 800; letter-spacing: -0.01em; }
 
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
 html { scroll-padding-top: 5rem; }
 :target { animation: target-flash 1.6s ease-out; }
 @keyframes target-flash { from { background: var(--flag-soft); } }
-@media (prefers-reduced-motion: reduce) { :target { animation: none; } }
+
+/* The gradient behind hero cards. */
+.hero-gradient { background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: var(--accent-ink); }
+
+/* CSS-only motion. `.animate-pop-in` for things that appear; `.animate-confetti` for a burst piece (set --dx, --dy, --rot). */
+@keyframes pop-in {
+  0% { opacity: 0; transform: scale(0.85); }
+  70% { opacity: 1; transform: scale(1.04); }
+  100% { opacity: 1; transform: scale(1); }
+}
+@keyframes confetti {
+  0% { opacity: 1; transform: translate(0, 0) rotate(0deg); }
+  100% { opacity: 0; transform: translate(var(--dx, 0px), var(--dy, 120px)) rotate(var(--rot, 360deg)); }
+}
+.animate-pop-in { animation: pop-in 0.35s ease-out both; }
+.animate-confetti { animation: confetti 1.1s ease-out forwards; }
+
+@media (prefers-reduced-motion: reduce) {
+  :target { animation: none; }
+  .animate-pop-in, .animate-confetti { animation: none; }
+  .animate-confetti { opacity: 0; }
+}

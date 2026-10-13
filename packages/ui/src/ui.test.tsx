@@ -32,8 +32,8 @@ describe("month view", () => {
     expect(screen.getByText(/Check SAC code on invoice INV-1: Korra was only 60% sure/)).toBeTruthy();
     expect(screen.getByText(/Your profile is missing PAN/)).toBeTruthy();
     const links = within(screen.getByText("Fix these before you can generate the pack:").parentElement!).getAllByRole("link");
-    expect(links.map((l) => l.textContent)).toEqual(["Open your details", "Go to SAC code"]);
-    expect(links.map((l) => l.getAttribute("href"))).toEqual(["/onboarding", "#inv-inv1-sacCode"]);
+    expect(links.map((l) => l.textContent)).toEqual(["Open settings", "Go to SAC code"]);
+    expect(links.map((l) => l.getAttribute("href"))).toEqual(["/settings", "#inv-inv1-sacCode"]);
     expect(screen.queryByRole("button", { name: "Generate EDF pack" })).toBeNull();
   });
 
@@ -199,9 +199,9 @@ describe("month view", () => {
 
     // Missing fields first, then flags, then the rest.
     const links = within(screen.getByText("Fix these before you can generate the pack:").parentElement!).getAllByRole("link");
-    expect(links.map((l) => l.textContent)).toEqual(["Open your details", "Add Client address", "Go to Invoice amount", "Go to upload", "See documents"]);
+    expect(links.map((l) => l.textContent)).toEqual(["Open settings", "Add Client address", "Go to Invoice amount", "Go to upload", "See documents"]);
     expect(links.map((l) => l.getAttribute("href"))).toEqual([
-      "/onboarding",
+      "/settings",
       "#inv-inv1-clientAddress",
       "#inv-inv1-amount",
       "#upload",

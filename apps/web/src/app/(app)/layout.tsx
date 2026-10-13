@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { Footer } from "@korra/ui";
 import { WebProviders } from "@/client/WebProviders";
+import { AppFrame } from "@/components/AppFrame";
 import { SignOutButton } from "@/components/SignOutButton";
 import { listCaClients } from "@korra/backend";
 import { currentUser, ownerCtx } from "@/server/ctx";
@@ -9,39 +10,25 @@ import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
-const NAV = [
-  { href: "/", label: "Month" },
-  { href: "/tracker", label: "Tracker" },
-  { href: "/settings", label: "Settings" },
-];
-
 /** App shell. "Clients" shows only for people who are somebody's CA. */
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const user = await currentUser();
   if (!user) redirect("/sign-in");
   const isCa = (await listCaClients(await ownerCtx())).length > 0;
-  const nav = isCa ? [...NAV, { href: "/ca", label: "Clients" }] : NAV;
   return (
     <WebProviders>
-      <div className="flex min-h-screen flex-col">
-        <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded focus:bg-surface focus:px-3 focus:py-2">Skip to content</a>
-        <header className="border-b border-line bg-surface">
-          <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
-            <Link href="/" className="font-serif text-xl font-semibold tracking-tight">Korra</Link>
-            <nav aria-label="Main" className="flex gap-1 text-sm">
-              {nav.map((n) => (
-                <Link key={n.href} href={n.href} className="rounded-md px-3 py-1.5 hover:bg-accent-soft">{n.label}</Link>
-              ))}
-            </nav>
-            <div className="ml-auto flex items-center gap-2 text-sm text-muted">
-              <span className="hidden sm:inline">{user.email}</span>
-              <SignOutButton />
-            </div>
-          </div>
-        </header>
-        <main id="main" className="mx-auto w-full max-w-5xl flex-1 px-4 py-8">{children}</main>
-        <Footer />
-      </div>
+      <AppFrame
+        actions={
+          <>
+            {isCa && <Link href="/ca" className="inline-flex min-h-11 items-center rounded-full px-3 font-bold hover:bg-surface-soft">Clients</Link>}
+            <span className="hidden sm:inline">{user.email}</span>
+            <SignOutButton />
+          </>
+        }
+        footer={<Footer />}
+      >
+        {children}
+      </AppFrame>
     </WebProviders>
   );
 }

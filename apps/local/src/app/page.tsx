@@ -6,7 +6,7 @@ export default function Home() {
   return (
     <div className="flex min-h-screen flex-col">
       <header className="mx-auto flex w-full max-w-3xl items-center justify-between px-4 py-5">
-        <span className="font-serif text-xl font-semibold tracking-tight">Korra</span>
+        <span className="text-xl font-extrabold tracking-tight">Korra</span>
         <LandingSkipLink />
       </header>
       <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-10">

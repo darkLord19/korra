@@ -2,7 +2,7 @@
 import { createContext, useContext, type AnchorHTMLAttributes, type ComponentType, type ReactNode } from "react";
 import type { KorraApi } from "./api";
 
-export type NavLinkProps = Pick<AnchorHTMLAttributes<HTMLAnchorElement>, "className" | "children" | "title" | "aria-label" | "id"> & { href: string };
+export type NavLinkProps = Pick<AnchorHTMLAttributes<HTMLAnchorElement>, "className" | "children" | "title" | "aria-label" | "aria-current" | "id"> & { href: string };
 
 /**
  * What the screens need from the app's router. Supplied by the app (next/link and useRouter in apps/web,
@@ -15,11 +15,16 @@ export interface KorraNav {
   /** Re-fetch whatever the app renders on the server. A no-op for apps that render only in the browser. */
   refresh(): void;
   hrefs: {
+    /** The marketing page. */
+    landing(): string;
+    /** The to-do list. */
     home(): string;
-    onboarding(): string;
+    /** A flow, opened from Home. */
+    task(id: string): string;
+    /** The months index (and payments due). */
+    months(): string;
     month(month: string): string;
     pack(packId: string): string;
-    tracker(): string;
     settings(): string;
   };
 }

@@ -13,7 +13,7 @@ function Tile({ label, hint, amounts, tone }: { label: string; hint: string; amo
         <p className="mt-2 text-lg text-muted">Nothing</p>
       ) : (
         <ul className="mt-2 space-y-0.5">
-          {amounts.map((m) => <li key={m.currency} className="font-serif text-2xl font-semibold">{money(m)}</li>)}
+          {amounts.map((m) => <li key={m.currency} className="text-2xl font-extrabold">{money(m)}</li>)}
         </ul>
       )}
       <p className="mt-2 text-xs text-muted">{hint}</p>

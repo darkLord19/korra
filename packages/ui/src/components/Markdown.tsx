@@ -26,7 +26,7 @@ export function Markdown({ source }: { source: string }) {
     if (h) {
       flushPara(); flushList();
       const level = h[1]!.length;
-      out.push(level <= 2 ? <h3 key={out.length} className="mt-5 mb-1 font-serif text-lg font-semibold">{inline(h[2]!)}</h3> : <h4 key={out.length} className="mt-4 font-semibold">{inline(h[2]!)}</h4>);
+      out.push(level <= 2 ? <h3 key={out.length} className="mt-5 mb-1 text-lg font-extrabold">{inline(h[2]!)}</h3> : <h4 key={out.length} className="mt-4 font-semibold">{inline(h[2]!)}</h4>);
     } else if (li) {
       flushPara();
       const ordered = !!li[2];
