@@ -1,11 +1,14 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { expect, test, type APIRequestContext } from "@playwright/test";
+import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
 
 const DEEL_CSV = readFileSync(fileURLToPath(new URL("../../../packages/ingest/fixtures/deel/synthetic-transactions.csv", import.meta.url)));
 // The dev fake extractor reads a file named demo-invoice.pdf as INV-2026-014 (USD 1,500, dated 2026-09-02).
 const PDF_BYTES = Buffer.from("%PDF-1.4\n1 0 obj<</Type/Catalog>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF\n");
 const MONTH = "2026-09";
+
+/** The guided flow's pane: Home's list can sit beside it, repeating titles, so a flow's buttons are found inside this. */
+const flow = (page: Page) => page.locator('section[aria-labelledby="flow-title"]');
 
 type Mail = { to: string; subject: string; text: string };
 
@@ -21,7 +24,7 @@ async function lastMailTo(request: APIRequestContext, to: string, subject: RegEx
   return found!;
 }
 
-test("sign up to EDF pack, tracker and CA invite", async ({ page, request }) => {
+test("sign up to a sent EDF pack, Payments due and CA invite", async ({ page, request }) => {
   const email = `jane+${Date.now()}@example.test`;
 
   // Cron routes refuse requests without the secret (none is configured here).
@@ -39,44 +42,47 @@ test("sign up to EDF pack, tracker and CA invite", async ({ page, request }) => 
   const link = /https?:\/\/\S+/.exec(verify.text)![0];
   await page.goto(link);
 
-  // Onboarding: one form with the profile and the bank.
-  await expect(page.getByRole("heading", { name: "Set up your details" })).toBeVisible();
-  await page.getByLabel("Legal name").fill("Jane Dev");
-  await page.getByLabel("Registered address").fill("12 MG Road, Bengaluru");
-  await page.getByLabel("GSTIN").fill("29ABCDE1234F1Z5");
-  await expect(page.getByLabel("PAN", { exact: true })).toHaveValue("ABCDE1234F"); // filled in from the GSTIN
-  await page.getByLabel("Which bank receives your foreign payments?").selectOption({ label: "Kotak Mahindra Bank" });
-  await page.getByLabel("AD code").fill("6390001");
-  await page.getByRole("button", { name: "Save and continue" }).click();
-  await expect(page).toHaveURL(/\/months\/\d{4}-\d{2}$/);
+  // Setup is the first task on Home: "Let's get you set up" -> the setup flow. (/onboarding leads here too.)
+  await expect(page).toHaveURL(/\/home$/);
+  await expect(page.getByRole("heading", { name: "Let's get you set up" })).toBeVisible();
+  await page.getByRole("link", { name: "Let's go" }).click();
+  await expect(page).toHaveURL(/\/home\?task=setup$/);
+  const setup = flow(page);
+  await expect(setup.getByRole("heading", { name: "Drop an invoice" })).toBeVisible();
 
-  // Upload the Deel CSV and the demo invoice for September 2026.
-  await page.goto(`/months/${MONTH}`);
+  // The dev fake reader finds no details of the exporter in the demo invoice: it says so and leaves the form alone.
+  await page.getByTestId("invoice-fill-input").setInputFiles({ name: "demo-invoice.pdf", mimeType: "application/pdf", buffer: PDF_BYTES });
+  await expect(setup.getByText("Couldn't read details from this file; fill them in by hand.")).toBeVisible();
+  await setup.getByRole("button", { name: "No invoice handy? Fill it in yourself" }).click();
+  await expect(setup.getByRole("heading", { name: "Is this you?" })).toBeVisible();
+  await setup.getByLabel("Legal name").fill("Jane Dev");
+  await setup.getByLabel("Registered address").fill("12 MG Road, Bengaluru");
+  await setup.getByLabel("GSTIN").fill("29ABCDE1234F1Z5");
+  await expect(setup.getByLabel("PAN", { exact: true })).toHaveValue("ABCDE1234F"); // filled in from the GSTIN
+  await setup.getByRole("button", { name: "Looks right" }).click();
+  await setup.getByRole("radio", { name: "Kotak Mahindra Bank" }).click();
+  await setup.getByRole("button", { name: "Save and continue" }).click();
+  await expect(page).toHaveURL(/\/home\?task=upload%3A\d{4}-\d{2}$/); // no invoice was dropped: the current month
+
+  // Upload the Deel CSV and the demo invoice for September 2026 (the upload task of that month).
+  await page.goto(`/home?task=${encodeURIComponent(`upload:${MONTH}`)}`);
+  const upload = flow(page);
+  await expect(upload.getByRole("heading", { name: "Add your September invoices" })).toBeVisible();
   await page.getByTestId("file-input").setInputFiles([
     { name: "synthetic-transactions.csv", mimeType: "text/csv", buffer: DEEL_CSV },
     { name: "demo-invoice.pdf", mimeType: "application/pdf", buffer: PDF_BYTES },
   ]);
-  await expect(page.getByRole("article", { name: "Invoice INV-2026-014" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: /To review \(\d+\)/ })).toContainText("(1)");
+  await expect(upload.getByText("Read ✓")).toHaveCount(2);
 
-  // Confirm the proposed match.
+  // Months: the invoice is a card; the proposed match and a payment typed by hand are under "Payments & matches".
+  await page.goto(`/months/${MONTH}`);
+  await expect(page.getByRole("heading", { level: 1, name: "September 2026" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Acme Corp/ })).toHaveCount(1);
+  await page.locator("summary").filter({ hasText: "Payments & matches" }).click();
+  await expect(page.getByRole("heading", { name: /To review \(\d+\)/ })).toContainText("(1)");
   await page.getByRole("button", { name: "Confirm", exact: true }).click();
   await expect(page.getByRole("heading", { name: /Confirmed \(1\)/ })).toBeVisible();
 
-  // The SAC code was read at 60% confidence: "I've checked these" confirms every field in one click.
-  const invoice = page.getByRole("article", { name: "Invoice INV-2026-014" });
-  await expect(invoice.getByText("Check this")).toBeVisible();
-  await invoice.getByRole("button", { name: /I.ve checked these/ }).click();
-  await expect(invoice.getByText("Check this")).toHaveCount(0);
-  await expect(invoice.getByRole("button", { name: /I.ve checked these/ })).toHaveCount(0);
-
-  // Editing a value still works.
-  await invoice.getByRole("button", { name: "Edit SAC code" }).click();
-  await invoice.getByLabel("SAC code", { exact: true }).fill("998314");
-  await invoice.getByRole("button", { name: "Save" }).click();
-  await expect(invoice.getByRole("button", { name: "Edit SAC code" })).toContainText("998314");
-
-  // A payment typed in by hand.
   await page.getByRole("button", { name: "Add payment by hand" }).click();
   const payForm = page.getByRole("form", { name: "Add payment by hand" });
   await payForm.getByLabel("Payer").fill("Hand Payer Ltd");
@@ -87,26 +93,45 @@ test("sign up to EDF pack, tracker and CA invite", async ({ page, request }) => 
   // Cell buttons carry aria-labels ("Edit Payer"), so the row's name omits the value: match the button text.
   await expect(page.getByRole("button", { name: "Edit Payer" }).filter({ hasText: "Hand Payer Ltd" })).toBeVisible();
 
-  // Generate the pack: four files.
-  await page.getByRole("button", { name: "Generate EDF pack" }).click();
-  await expect(page).toHaveURL(/\/packs\/[^/]+$/);
-  await expect(page.getByRole("heading", { name: /EDF pack for/ })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Download" })).toHaveCount(4);
-  await expect(page.getByText("Korra does not submit anything for you")).toBeVisible();
+  // Review: the SAC code was read at 60% confidence and is the one thing to check. "Fix it" edits it.
+  await page.getByRole("link", { name: /Check 1 thing/ }).click();
+  await expect(page).toHaveURL(/\/home\?task=review%3A2026-09$/);
+  const review = flow(page);
+  await expect(review.getByText(/as the SAC code on INV-2026-014/)).toBeVisible();
+  await review.getByRole("button", { name: "Fix it" }).click();
+  await review.getByLabel("SAC code", { exact: true }).fill("998314");
+  await review.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(review.getByText("All checked ✓")).toBeVisible();
 
-  // Record the submission with an acknowledgement. It is stored, not read as an invoice
+  // Make the pack, choose the paper signature, and the four files are there.
+  await review.getByRole("button", { name: "Make my pack" }).click();
+  await expect(page).toHaveURL(/\/home\?task=generate%3A2026-09%3A/);
+  await review.getByRole("button", { name: "Make my pack" }).click();
+  await expect(review.getByRole("heading", { name: "Sign your pack" })).toBeVisible();
+  await review.getByRole("button", { name: "My bank needs a wet signature" }).click();
+  await expect(review.getByRole("heading", { name: "Send your pack" })).toBeVisible();
+  await review.getByText("What's inside").click();
+  await expect(review.getByRole("link", { name: /^Download .+/ })).toHaveCount(4);
+  await expect(review.getByRole("button", { name: "Download pack" })).toBeVisible();
+
+  // Mark it sent with an acknowledgement. It is stored, not read as an invoice
   // (the file is deliberately named like the demo invoice: if it were ingested it would add a second invoice).
-  await page.getByTestId("file-input").setInputFiles({ name: "demo-invoice.pdf", mimeType: "application/pdf", buffer: PDF_BYTES });
-  await expect(page.getByText("Uploaded", { exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Mark as submitted" }).click();
-  await expect(page.getByText(/^Submitted \d/)).toBeVisible();
+  await review.getByRole("button", { name: "I've sent it →" }).click();
+  await expect(review.getByRole("heading", { name: "Mark it as sent" })).toBeVisible();
+  await review.getByTestId("file-input").setInputFiles({ name: "demo-invoice.pdf", mimeType: "application/pdf", buffer: PDF_BYTES });
+  await expect(review.getByText("Uploaded", { exact: true })).toBeVisible();
+  await review.getByRole("button", { name: "Mark as sent" }).click();
+  await expect(review.getByText("Sent!")).toBeVisible();
   await page.goto(`/months/${MONTH}`);
+  await page.locator("summary").filter({ hasText: /^Documents/ }).click();
   await expect(page.getByText("Bank acknowledgement")).toBeVisible();
-  await expect(page.getByRole("article")).toHaveCount(1);
+  await expect(page.getByRole("button", { name: /Acme Corp/ })).toHaveCount(1);
 
-  // The invoice is realised in the tracker.
+  // The invoice is realised under "Payments due" on the Months page (/tracker leads there too).
   await page.goto("/tracker");
-  const row = page.getByRole("row", { name: /INV-2026-014/ });
+  await expect(page).toHaveURL(/\/months$/);
+  await expect(page.getByRole("heading", { name: "Payments due" })).toBeVisible();
+  const row = page.getByRole("listitem").filter({ hasText: "INV-2026-014" });
   await expect(row).toContainText("Realised");
   await expect(row).toContainText("Acme Corp");
 
@@ -133,15 +158,29 @@ test("sign up to EDF pack, tracker and CA invite", async ({ page, request }) => 
   await expect(page.getByRole("heading", { name: "Jane Dev invited you" })).toBeVisible();
   await page.getByRole("button", { name: "Accept" }).click();
   await expect(page).toHaveURL(/\/ca$/);
-  await expect(page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Clients" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Clients" })).toBeVisible();
   await page.getByRole("link", { name: "Open Jane Dev's records" }).click();
   await expect(page.getByText(/Viewing Jane Dev.s records \(read-only\)/)).toBeVisible();
   await page.goto(`${new URL(page.url()).pathname.replace(/\/months\/.*/, "")}/months/${MONTH}`);
-  await expect(page.getByRole("article", { name: "Invoice INV-2026-014" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Edit SAC code" })).toHaveCount(0);
-  await expect(page.getByRole("heading", { name: "Upload" })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Generate EDF pack" })).toHaveCount(0);
-  await page.getByRole("link", { name: /Pack generated/ }).click();
-  await expect(page.getByRole("link", { name: "Download" })).toHaveCount(4);
-  await expect(page.getByRole("button", { name: "Mark as submitted" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { level: 1, name: "September 2026" })).toBeVisible();
+
+  // Read-only: the invoice opens, its fields cannot be edited, and nothing can be added or made.
+  await page.getByRole("button", { name: /Acme Corp/ }).click();
+  const sheet = page.getByRole("dialog", { name: "Invoice INV-2026-014" });
+  await expect(sheet).toBeVisible();
+  await expect(sheet.getByText("998314")).toBeVisible();
+  await expect(sheet.getByRole("button", { name: "Edit SAC code" })).toHaveCount(0);
+  await sheet.getByRole("button", { name: "Close" }).click();
+  await expect(page.getByRole("button", { name: "Add documents" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Add an invoice by hand" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: /Make my pack|Send your pack/ })).toHaveCount(0);
+
+  // The pack is its summary and four files; "Payments due" is there too.
+  await page.getByRole("link", { name: /Kotak Mahindra Bank/ }).click();
+  await expect(page.getByRole("heading", { name: "EDF pack for September 2026" })).toBeVisible();
+  await expect(page.getByRole("link", { name: /^Download .+/ })).toHaveCount(4);
+  await expect(page.getByRole("button", { name: /Mark as sent|I've sent it/ })).toHaveCount(0);
+  await page.getByRole("link", { name: "Payments due" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Payments due" })).toBeVisible();
+  await expect(page.getByRole("listitem").filter({ hasText: "INV-2026-014" })).toContainText("Realised");
 });
