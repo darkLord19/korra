@@ -75,7 +75,7 @@ export function PackRoute() {
   if (!id) return <Alert tone="danger">No pack was chosen.</Alert>;
   return (
     <>
-      <PackScreen key={id} packId={id} {...(flow === "tracking" ? {} : { step: <Stepper current={3} /> })} />
+      <PackScreen key={id} packId={id} />
       {flow !== "tracking" && <KeepTrackingCard />}
     </>
   );

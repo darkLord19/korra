@@ -32,6 +32,8 @@ export { FlowFrame } from "./flows/FlowFrame";
 export { SetupFlow } from "./flows/SetupFlow";
 export { UploadFlow } from "./flows/UploadFlow";
 export { ReviewFlow } from "./flows/ReviewFlow";
+export { PackFlow } from "./flows/PackFlow";
+export type { PackFlowProps } from "./flows/PackFlow";
 export type { FlowProps } from "./flows/types";
 
 export { ProfileForm } from "./forms/ProfileForm";
