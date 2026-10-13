@@ -18,7 +18,7 @@ export default function Landing() {
       <main className="mx-auto w-full max-w-3xl flex-1 space-y-8 px-4 pb-10">
         <section className="hero-gradient rounded-3xl p-6 text-white shadow-lg sm:p-10">
           <h1 className="text-4xl leading-tight text-white sm:text-5xl">Your export declaration forms, ready for the bank.</h1>
-          <p className="mt-4 max-w-xl text-base text-white/90 sm:text-lg">
+          <p className="mt-4 max-w-xl text-base text-white sm:text-lg">
             If you invoice foreign clients from India, your AD bank needs an Export Declaration Form (EDF) for each month&rsquo;s invoices.
             Korra reads your invoices and payment statements, matches payments to invoices, and prepares the pack for your bank.
           </p>
@@ -54,7 +54,7 @@ export default function Landing() {
         Your documents and details are stored only in this browser. Korra has no server copy.{" "}
         <Link href="/privacy" className="underline">Privacy</Link>
       </div>
-      <Footer />
+      <div className="mx-auto w-full max-w-3xl"><Footer /></div>
     </div>
   );
 }

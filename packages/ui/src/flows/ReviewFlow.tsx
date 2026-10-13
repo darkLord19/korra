@@ -5,7 +5,7 @@ import { Alert, Button, EmptyState, FileName, IconBubble, Skeleton } from "../co
 import { useApi } from "../context";
 import { errorMessage } from "../errors";
 import { INVOICE_FIELDS, type FieldData } from "../lib/fields";
-import { FIELD_LABELS } from "../lib/format";
+import { FIELD_LABELS, midSentence } from "../lib/format";
 import { FieldEditor, displayField } from "../month/FieldEditor";
 import { useLoaded } from "../screens/useLoaded";
 import { FlowFrame } from "./FlowFrame";
@@ -89,6 +89,8 @@ export function ReviewFlow({ task, onDone, onClose }: FlowProps) {
   const spec = INVOICE_FIELDS.find((f) => f.name === current.field);
   const label = FIELD_LABELS[current.field] ?? current.field;
   const invoiceNo = inv?.invoiceNo.value ?? "this invoice";
+  // How the card's sentence names the invoice: by number, except for the number itself (it would repeat) and when it has none.
+  const named = current.field === "invoiceNo" ? "this invoice" : invoiceNo;
   const data: FieldData = (inv?.[current.field as keyof InvoiceWire] as FieldData | undefined) ?? { value: null, confidence: 0, source: "default" };
   const kind = spec?.kind ?? "text";
   const shown = displayField(kind, data.value, banks);
@@ -109,10 +111,10 @@ export function ReviewFlow({ task, onDone, onClose }: FlowProps) {
       <div key={current.key} className="space-y-4 rounded-2xl border border-line bg-surface p-5 animate-pop-in">
         <IconBubble icon={current.missing ? "✏️" : "🔎"} tone="flag" />
         {current.missing ? (
-          <p className="text-lg">{invoiceNo} is missing its {label}</p>
+          <p className="text-lg">{named === "this invoice" ? "This invoice" : named} is missing its {midSentence(label)}</p>
         ) : (
           <div className="space-y-1">
-            <p className="text-lg">Korra read <strong>{shown}</strong> as the {label} on {invoiceNo}</p>
+            <p className="text-lg">Korra read <strong>{shown}</strong> as the {midSentence(label)} on {named}</p>
             <p className="text-sm text-muted">{confidence < 0.5 ? `Not sure (${pct}%)` : `Fairly sure (${pct}%)`}</p>
           </div>
         )}

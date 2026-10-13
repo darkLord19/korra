@@ -45,7 +45,7 @@ export function InvoiceSheet({ invoice, banks, realisation, readOnly = false, on
                   <EditableCell
                     entity="invoice" id={invoice.id} field={f.name} kind={f.kind} data={invoice[f.name] as never} banks={banks}
                     readOnly={readOnly} onChanged={onChanged} anchor={invoiceAnchor(invoice.id, f.name)} label={FIELD_LABELS[f.name]!}
-                    required={REQUIRED.includes(f.name)}
+                    required={REQUIRED.includes(f.name)} showEdited={false}
                   />
                 </dd>
               </div>

@@ -83,8 +83,15 @@ html { scroll-padding-top: 5rem; }
 :target { animation: target-flash 1.6s ease-out; }
 @keyframes target-flash { from { background: var(--flag-soft); } }
 
-/* The gradient behind hero cards. */
-.hero-gradient { background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: var(--accent-ink); }
+/*
+ * The gradient behind hero cards. Its own stops (not the accent tokens, which turn light in dark mode): white text on
+ * the lighter stop is 4.96:1 in light mode and 4.89:1 in dark mode, so even small solid white text passes WCAG AA.
+ * Keep text on it solid white (no translucent white: at 90% the lighter stop drops to about 4.3:1).
+ */
+.hero-gradient { background: linear-gradient(135deg, var(--accent), #8350e4); color: #fff; }
+@media (prefers-color-scheme: dark) {
+  .hero-gradient { background: linear-gradient(135deg, #5a48d8, #8b4fe0); }
+}
 
 /* CSS-only motion. `.animate-pop-in` for things that appear; `.animate-confetti` for a burst piece (set --dx, --dy, --rot). */
 @keyframes pop-in {

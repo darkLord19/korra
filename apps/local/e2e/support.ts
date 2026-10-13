@@ -115,7 +115,7 @@ async function reviewStep(page: Page): Promise<void> {
   const before = await card.first().innerText();
   const missing = /is missing its (.+)$/.exec(before);
   if (missing) {
-    expect(missing[1], "the only field the local reader cannot find").toBe("Client address");
+    expect(missing[1], "the only field the local reader cannot find").toBe("client address");
     await f.getByLabel("Client address", { exact: true }).fill(CLIENT_ADDRESS);
     await f.getByRole("button", { name: "Save", exact: true }).click();
   } else {

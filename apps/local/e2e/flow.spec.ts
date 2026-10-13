@@ -64,30 +64,30 @@ async function mainFlow(page: Page, context: BrowserContext, request: APIRequest
   /* -------------- review: one card at a time, each way of answering -------------- */
   await expect(f.getByRole("heading", { name: "A few quick checks" })).toBeVisible();
   const card = f.getByText(/ is missing its | read .* as the /).first();
-  await expect(card).toContainText("as the Invoice number on INV-2026-014");
+  await expect(card).toContainText("as the invoice number on this invoice");
   await expect(f.getByRole("button", { name: "Everything on INV-2026-014 looks right" })).toBeVisible();
 
   await f.getByRole("button", { name: "Skip", exact: true }).click(); // the skipped card goes to the end of the queue
-  await expect(card).toContainText("as the Invoice date");
+  await expect(card).toContainText("as the invoice date");
   await f.getByRole("button", { name: "Looks right", exact: true }).click();
-  await expect(card).toContainText("as the Client name");
+  await expect(card).toContainText("as the client name");
   await f.getByRole("button", { name: "Looks right", exact: true }).click();
 
   // The one field the local reader cannot find is asked for, not guessed: there is no "Looks right" for it.
-  await expect(card).toContainText("INV-2026-014 is missing its Client address");
+  await expect(card).toContainText("INV-2026-014 is missing its client address");
   await expect(f.getByRole("button", { name: "Looks right", exact: true })).toHaveCount(0);
   await f.getByLabel("Client address", { exact: true }).fill("1 Main Street, New York, NY 10001");
   await f.getByRole("button", { name: "Save", exact: true }).click();
 
-  await expect(card).toContainText("as the Client country");
+  await expect(card).toContainText("as the client country");
   await f.getByRole("button", { name: "Looks right", exact: true }).click();
-  await expect(card).toContainText("as the Invoice amount");
+  await expect(card).toContainText("as the invoice amount");
   await f.getByRole("button", { name: "Looks right", exact: true }).click();
-  await expect(card).toContainText("as the Net realisable value");
+  await expect(card).toContainText("as the net realisable value");
   await f.getByRole("button", { name: "Looks right", exact: true }).click();
 
   // "Fix it" opens an editor on the card; saving the new value settles the card.
-  await expect(card).toContainText("as the Service description");
+  await expect(card).toContainText("as the service description");
   await f.getByRole("button", { name: "Fix it" }).click();
   await f.getByLabel("Service description", { exact: true }).fill("Software development services");
   await f.getByRole("button", { name: "Save", exact: true }).click();

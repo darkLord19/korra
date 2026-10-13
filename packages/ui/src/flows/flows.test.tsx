@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import type { BlockerWire, DocumentWire, ProfileSuggestionWire } from "@korra/backend/schemas";
 import { KorraApiError } from "../errors";
-import { currentMonthIST } from "../lib/format";
+import { currentMonthIST, dateLabel } from "../lib/format";
 import { panForGstinChange, panMismatch } from "../lib/profile";
 import type { Task } from "../home/tasks";
 import { FieldEditor } from "../month/FieldEditor";
@@ -308,8 +308,34 @@ describe("ReviewFlow", () => {
       blockersByBank: blockersFor([flagged("inv1", "amount", 0.3)]),
     });
     run(reviewApi(state, cleared));
-    expect((await screen.findByText(/Korra read/)).textContent).toBe("Korra read USD 1,500.00 as the Invoice amount on INV-1");
+    expect((await screen.findByText(/Korra read/)).textContent).toBe("Korra read USD 1,500.00 as the invoice amount on INV-1");
     expect(screen.getByText("Not sure (30%)")).toBeTruthy();
+  });
+
+  it("names the invoice number's own invoice as 'this invoice', and reads dates as dates", async () => {
+    const noFlagged = monthState({ invoices: [invoice({ invoiceNo: field("INV-1", 0.4) })], blockersByBank: blockersFor([flagged("inv1", "invoiceNo", 0.4)]) });
+    const { unmount } = run(reviewApi(noFlagged, cleared));
+    expect((await screen.findByText(/Korra read/)).textContent).toBe("Korra read INV-1 as the invoice number on this invoice");
+    unmount();
+    const dated = monthState({ invoices: [invoice({ invoiceDate: field("2026-09-02", 0.4) })], blockersByBank: blockersFor([flagged("inv1", "invoiceDate", 0.4)]) });
+    run(reviewApi(dated, cleared));
+    expect((await screen.findByText(/Korra read/)).textContent).toBe(`Korra read ${dateLabel("2026-09-02")} as the invoice date on INV-1`);
+  });
+
+  it("starts a missing-number sentence with a capital, and keeps acronyms as they are", async () => {
+    const state = monthState({
+      invoices: [invoice({ invoiceNo: field<string>(null, 0, "default") })],
+      blockersByBank: blockersFor([{ kind: "missing_field", entity: "invoice", id: "inv1", field: "invoiceNo" }]),
+    });
+    const { unmount } = run(reviewApi(state, cleared));
+    expect(await screen.findByText("This invoice is missing its invoice number")).toBeTruthy();
+    unmount();
+    const sac = monthState({
+      invoices: [invoice({ sacCode: field<string>(null, 0, "default") })],
+      blockersByBank: blockersFor([{ kind: "missing_field", entity: "invoice", id: "inv1", field: "sacCode" }]),
+    });
+    run(reviewApi(sac, cleared));
+    expect(await screen.findByText("INV-1 is missing its SAC code")).toBeTruthy();
   });
 
   it("'Looks right' saves the same value and reloads", async () => {
@@ -347,12 +373,12 @@ describe("ReviewFlow", () => {
   it("orders by field, and Skip moves the item to the end", async () => {
     const user = userEvent.setup();
     run(reviewApi(twoFlags, cleared));
-    expect((await screen.findByText(/Korra read/)).textContent).toBe("Korra read Acme Corp as the Client name on INV-1");
+    expect((await screen.findByText(/Korra read/)).textContent).toBe("Korra read Acme Corp as the client name on INV-1");
     expect(screen.getByRole("img", { name: "Step 1 of 2" })).toBeTruthy();
     await user.click(screen.getByRole("button", { name: "Skip" }));
     expect(screen.getByText(/Korra read/).textContent).toBe("Korra read 998314 as the SAC code on INV-1");
     await user.click(screen.getByRole("button", { name: "Skip" }));
-    expect(screen.getByText(/Korra read/).textContent).toContain("Client name");
+    expect(screen.getByText(/Korra read/).textContent).toContain("client name");
   });
 
   it("de-duplicates items that every bank repeats", async () => {
@@ -389,7 +415,7 @@ describe("ReviewFlow", () => {
     const api = reviewApi(state, cleared);
     const user = userEvent.setup();
     run(api);
-    expect(await screen.findByText("INV-1 is missing its Client country")).toBeTruthy();
+    expect(await screen.findByText("INV-1 is missing its client country")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Looks right" })).toBeNull();
     await user.type(screen.getByLabelText("Client country"), "US");
     await user.click(screen.getByRole("button", { name: "Save" }));

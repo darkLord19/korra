@@ -48,5 +48,20 @@ export const FIELD_LABELS: Record<string, string> = {
   legalName: "Legal name", address: "Address", pan: "PAN", gstin: "GSTIN", defaultAdBankId: "Default AD bank",
 };
 
+const COMPANY_WORDS = new Set(["pvt", "private", "ltd", "limited", "llp", "llc", "inc", "corp", "corporation", "co", "company", "opc", "m/s"]);
+
+/**
+ * The name to greet: the legal name's first word in title case ("JANE DEV CONSULTING" -> "Jane"), or null when that word
+ * is only a company suffix ("PVT LTD ..."). A word that already mixes cases ("McDonald") is kept as typed.
+ */
+export function greetingName(legalName: string | null | undefined): string | null {
+  const word = legalName?.trim().split(/\s+/)[0]?.replace(/[^\p{L}\p{M}'’-]+$/u, "");
+  if (!word || COMPANY_WORDS.has(word.toLowerCase())) return null;
+  return word === word.toUpperCase() || word === word.toLowerCase() ? word.charAt(0).toUpperCase() + word.slice(1).toLowerCase() : word;
+}
+
+/** A field label inside a sentence: "Invoice number" -> "invoice number", while "SAC code" and "AD bank" keep their capitals. */
+export const midSentence = (label: string): string => (/^\p{Lu}\p{Ll}/u.test(label) ? label.charAt(0).toLowerCase() + label.slice(1) : label);
+
 /** Whole days from `from` to `to` (ISO dates); negative when `to` is earlier. */
 export const daysBetween = (from: string, to: string): number => Math.round((Date.parse(to) - Date.parse(from)) / 86_400_000);

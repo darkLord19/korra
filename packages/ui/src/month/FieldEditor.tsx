@@ -5,13 +5,16 @@ import { Button, Input, Select, cx } from "../components";
 import { useApi } from "../context";
 import { errorMessage } from "../errors";
 import { RECEIPT_MODES, type FieldData, type FieldKind } from "../lib/fields";
-import { money } from "../lib/format";
+import { dateLabel, money } from "../lib/format";
 import { majorToMinor, minorToMajor } from "../lib/money-input";
 
-/** How a field value reads on screen ("" when it has none). */
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** How a field value reads on screen ("" when it has none). Dates read as "2 Sep 2026"; the date input keeps ISO. */
 export function displayField(kind: FieldKind, value: unknown, banks: AdBankWire[]): string {
   if (value === null || value === undefined || value === "") return "";
   if (kind === "money") return money(value as MoneyWire);
+  if (kind === "date" && ISO_DATE.test(String(value))) return dateLabel(String(value));
   if (kind === "receiptMode") return RECEIPT_MODES[value as keyof typeof RECEIPT_MODES] ?? String(value);
   if (kind === "bankId") return banks.find((b) => b.id === value)?.name ?? "Unknown bank";
   return String(value);

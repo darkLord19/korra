@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import type { PackWire } from "@korra/backend/schemas";
 import { KorraApiError } from "../errors";
+import { dateLabel } from "../lib/format";
 import { MonthScreen } from "../screens/MonthScreen";
 import { Wrap, fakeApi, field, invoice, monthState } from "../test-utils";
 import { MonthView } from "./MonthView";
@@ -69,6 +70,17 @@ describe("MonthView invoices", () => {
     expect(labels[0]).toBe("SAC code"); // the flagged field leads
     expect(within(sheet).getByRole("button", { name: "Edit Client name" })).toBeTruthy();
     expect(sheet.querySelector("#inv-inv1-sacCode")).toBeTruthy();
+  });
+
+  it("reads dates as dates in the sheet, and does not tag every reviewed field 'edited'", async () => {
+    view({ state: monthState({ invoices: [invoice({ clientName: field("Acme Corp", 1, "user"), sacCode: field("998314", 1, "user") })] }) });
+    await userEvent.click(screen.getByRole("button", { name: /Acme Corp/ }));
+    const sheet = screen.getByRole("dialog", { name: "Invoice INV-1" });
+    expect(within(sheet).getByRole("button", { name: "Edit Invoice date" }).textContent).toBe(dateLabel("2026-09-02"));
+    expect(within(sheet).queryByText("2026-09-02")).toBeNull();
+    expect(within(sheet).queryByText("edited")).toBeNull();
+    await userEvent.click(within(sheet).getByRole("button", { name: "Edit Invoice date" }));
+    expect((within(sheet).getByLabelText("Invoice date") as HTMLInputElement).value).toBe("2026-09-02"); // the input stays ISO
   });
 
   it("opens the sheet for the invoice the URL hash points at", () => {
