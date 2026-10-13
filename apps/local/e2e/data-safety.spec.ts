@@ -283,16 +283,39 @@ test.describe("persistent storage", () => {
     await expect(page.getByRole("heading", { level: 1, name: "Months" })).toBeVisible();
     const warning = storageWarning(page);
     await expect(warning).toBeVisible();
+    await expect(warning).toContainText("Your data could be cleared by the browser");
     await expect(warning).toContainText("Back up regularly");
     await expect(warning.getByRole("button")).toHaveCount(0);
     await expect(warning).not.toContainText("Home Screen"); // Chrome: not a Safari problem
     await page.reload();
     await expect(storageWarning(page)).toBeVisible();
 
+    await expect(warning.getByRole("link", { name: "Storage settings" })).toBeHidden(); // one line until opened
+    await warning.getByText("How to protect it").click();
     await warning.getByRole("link", { name: "Storage settings" }).click();
     await expect(page).toHaveURL(/\/settings$/);
     await expect(backupPanel(page).getByText("Storage: not protected")).toBeVisible();
     await expect(backupPanel(page).getByRole("button", { name: "Ask the browser again" })).toBeVisible();
+  });
+
+  test.describe("on a phone", () => {
+    test.use({ viewport: { width: 390, height: 844 } });
+    test("the banners step aside while a Home flow is open, and are back on the list and the other tabs", async ({ page }) => {
+      await stubPersist(page, false);
+      await page.goto("/home?task=upload:2026-09");
+      await expect(flow(page).getByRole("heading", { name: "Add your September invoices" })).toBeVisible();
+      await expect(page.getByRole("region", { name: "Privacy notice" })).toBeHidden();
+      await expect(storageWarning(page)).toBeHidden();
+
+      await page.goto("/home"); // the list: both show, each a single compact strip
+      await expect(page.getByRole("region", { name: "Privacy notice" })).toBeVisible();
+      await expect(storageWarning(page)).toBeVisible();
+      expect((await storageWarning(page).boundingBox())!.height, "the warning is a one-line strip").toBeLessThan(64);
+      await expect(flow(page), "a phone shows the list only, not the hero's flow").toHaveCount(0);
+
+      await page.goto("/months");
+      await expect(storageWarning(page)).toBeVisible();
+    });
   });
 
   test.describe("on Safari", () => {

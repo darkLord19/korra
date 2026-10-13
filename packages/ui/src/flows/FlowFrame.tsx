@@ -10,7 +10,8 @@ export interface FlowAction { label: string; onClick?: () => void; type?: "butto
  * Action bar placement: below `lg` it is sticky at the bottom of the viewport, with safe-area padding. Below `md`
  * AppShell shows a fixed bottom tab bar (3.5rem tall plus the safe area), so the bar is offset above it
  * (`bottom-[calc(3.5rem+env(safe-area-inset-bottom))]`); from `md` there is no tab bar and it sits at `bottom-0`.
- * At `lg` and up it is inline at the end of the pane. The primary action is full width on phones.
+ * At `lg` and up it is inline at the end of the pane. The primary action is full width on phones. Keep a flow's whole
+ * body (celebration cards, notes) inside `children`: anything rendered after the frame sits under the bar.
  */
 export function FlowFrame({ title, step, onClose, primary, secondary, children }: {
   title: string;
@@ -22,12 +23,13 @@ export function FlowFrame({ title, step, onClose, primary, secondary, children }
 }) {
   return (
     <section aria-labelledby="flow-title" className="mx-auto flex w-full max-w-xl flex-col">
-      <header className="flex items-center gap-3 pb-4">
-        <button type="button" onClick={onClose} aria-label="Close" className="inline-flex size-11 shrink-0 items-center justify-center rounded-full text-xl text-muted hover:bg-accent-soft">
+      {/* Below `md` the dots take their own line under the title (which may wrap); from `md` they share its row. */}
+      <header className="flex flex-wrap items-center gap-x-3 gap-y-1 pb-4 md:flex-nowrap">
+        <button type="button" onClick={onClose} aria-label="Close" data-flow-close className="inline-flex size-11 shrink-0 items-center justify-center rounded-full text-xl text-muted hover:bg-accent-soft">
           <span aria-hidden="true">✕</span>
         </button>
-        <h1 id="flow-title" className="min-w-0 flex-1 truncate text-xl">{title}</h1>
-        {step && <ProgressDots index={step.index} total={step.total} />}
+        <h1 id="flow-title" className="min-w-0 flex-1 text-xl">{title}</h1>
+        {step && <div className="basis-full pl-14 md:basis-auto md:pl-0"><ProgressDots index={step.index} total={step.total} /></div>}
       </header>
       <div className="min-w-0 flex-1 space-y-4 pb-6">{children}</div>
       {(primary || secondary) && (

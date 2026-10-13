@@ -1,3 +1,8 @@
 @import "tailwindcss";
 /* Design tokens, theme and base styles come from the shared UI package; it also tells Tailwind to scan its components. */
 @import "@korra/ui/styles.css";
+
+/* Below `lg` a Home flow takes the whole screen: the banners step aside (HomeRoute sets data-flow-open while `?task=` is set). */
+@media (max-width: 1023.98px) {
+  html[data-flow-open] [data-banner] { display: none; }
+}

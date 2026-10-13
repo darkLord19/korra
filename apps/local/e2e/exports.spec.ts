@@ -44,8 +44,8 @@ test.describe("first-run privacy notice and the Privacy page", () => {
     await page.goto("/home");
     await expect(page.getByRole("heading", { name: "Let's get you set up" })).toBeVisible();
     await expect(notice(page)).toBeVisible();
-    await expect(notice(page)).toContainText(LEAD);
-    await expect(notice(page)).toContainText(DISCLAIMER);
+    await expect(notice(page)).toContainText("Your data stays on this device");
+    await expect(notice(page).getByRole("link", { name: "How it is handled" })).toHaveAttribute("href", "/privacy");
     await notice(page).getByRole("button", { name: "Got it" }).click();
     await expect(notice(page)).toHaveCount(0);
 

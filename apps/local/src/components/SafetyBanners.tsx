@@ -26,14 +26,16 @@ export function SafariAdvice() {
 
 /**
  * Banners above every screen: the one-off notice after a restore, and the storage warning (while the browser has not
- * promised to keep our data; it cannot be dismissed). The "Back up your data" prompt is the Home backup task now.
+ * promised to keep our data; it cannot be dismissed). The warning is one line, with the full text behind "How to
+ * protect it". The "Back up your data" prompt is the Home backup task now. A phone hides them while a Home flow is
+ * open (see `data-banner` in globals.css).
  */
 export function SafetyBanners() {
   const s = useSafety();
   const unprotected = s.persist !== "checking" && !isProtected(s.persist);
   if (!s.notice && !unprotected) return null;
   return (
-    <div className="mb-6 space-y-3">
+    <div data-banner className="mb-4 space-y-2">
       {s.notice && (
         <section aria-label="Notice">
           <Alert tone="success">
@@ -45,14 +47,21 @@ export function SafetyBanners() {
         </section>
       )}
       {unprotected && (
-        <section aria-label="Storage warning">
-          <Alert tone="warning" title="Your data is not protected from being cleared">
-            <p>
+        <section aria-label="Storage warning" className="rounded-xl border border-flag/40 bg-flag-soft px-3 text-[13px] sm:text-sm">
+          <details className="group">
+            <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 [&::-webkit-details-marker]:hidden">
+              <span aria-hidden="true" className="size-2.5 shrink-0 rounded-full bg-flag" />
+              <span className="min-w-0 flex-1 font-medium">Your data could be cleared by the browser</span>
+              {/* On a phone the label is a chevron (its name is still "How to protect it"): the line has no room for both. */}
+              <span className="shrink-0 font-medium max-sm:sr-only sm:underline sm:group-open:no-underline">How to protect it</span>
+              <span aria-hidden="true" className="shrink-0 transition-transform group-open:rotate-180 sm:hidden">▾</span>
+            </summary>
+            <p className="pb-3">
               Your browser can delete the data Korra keeps here when it needs space, and Korra has no server copy. Back up regularly.
               <SafariAdvice />{" "}
               <Link href="/settings" className="font-medium underline">Storage settings</Link>
             </p>
-          </Alert>
+          </details>
         </section>
       )}
     </div>

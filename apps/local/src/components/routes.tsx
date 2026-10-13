@@ -20,6 +20,12 @@ const afterSubmit = <AfterSubmitCard />;
 export function HomeRoute() {
   const taskId = useSearchParams().get("task");
   const extraTasks = useBackupTasks(taskId);
+  // Tells the layout's banners (outside this tree) that a flow is open: globals.css hides them below `lg`.
+  useEffect(() => {
+    if (taskId === null) return;
+    document.documentElement.setAttribute("data-flow-open", "");
+    return () => document.documentElement.removeAttribute("data-flow-open");
+  }, [taskId]);
   if (extraTasks === null) return <Loading />;
   return <HomeScreen taskId={taskId} extraTasks={extraTasks} renderExtraTask={renderExtraTask} afterSubmit={afterSubmit} />;
 }

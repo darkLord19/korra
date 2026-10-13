@@ -2,7 +2,7 @@
 // All privacy wording lives here: the first-run notice, the Settings summary and the /privacy page.
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Alert, Button, Card, CardBody, CardHeader, DISCLAIMER } from "@korra/ui";
+import { Button, Card, CardBody, CardHeader, DISCLAIMER } from "@korra/ui";
 import { dismissPrivacyNotice, isPrivacyNoticeDismissed } from "@/lib/privacy-notice";
 import { SafariAdvice } from "./SafetyBanners";
 
@@ -31,22 +31,21 @@ export function UsageStatement() {
   );
 }
 
-/** First run only: a short, dismissible notice above every screen. Not a dialog, so nothing waits on it. */
+/** First run only: a one-line, dismissible notice above every screen. Not a dialog, so nothing waits on it. */
 export function PrivacyNotice() {
   // Read storage in an effect, never while rendering: the server render and the first client render must match.
   const [visible, setVisible] = useState(false);
   useEffect(() => setVisible(!isPrivacyNoticeDismissed()), []);
   if (!visible) return null;
   return (
-    <section aria-label="Privacy notice" className="mx-auto w-full max-w-6xl px-4 pt-6">
-      <Alert tone="info" title="Your data stays on this device">
-        <p>{PRIVACY_LEAD}</p>
-        <p className="mt-1">{DISCLAIMER}</p>
-        <div className="mt-3 flex flex-wrap items-center gap-3">
-          <Button size="sm" onClick={() => { dismissPrivacyNotice(); setVisible(false); }}>Got it</Button>
-          <Link href="/privacy" className="text-sm font-medium underline">How your data is handled</Link>
-        </div>
-      </Alert>
+    <section aria-label="Privacy notice" data-banner className="mx-auto w-full max-w-6xl px-4 pt-4">
+      <div className="flex items-center gap-3 rounded-xl border border-line bg-accent-soft py-1.5 pl-3 pr-1.5 text-[13px] sm:text-sm">
+        <p className="min-w-0 flex-1">
+          <span className="font-semibold">Your data stays on this device.</span>{" "}
+          <Link href="/privacy" className="font-medium underline max-sm:hidden">How it is handled</Link>
+        </p>
+        <Button size="sm" onClick={() => { dismissPrivacyNotice(); setVisible(false); }}>Got it</Button>
+      </div>
     </section>
   );
 }

@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { AppShell } from "./shell/AppShell";
 import { ProgressDots, Sheet } from "./components";
+import { FlowFrame } from "./flows/FlowFrame";
 import { fakeApi, testNav, Wrap } from "./test-utils";
 
 describe("Sheet", () => {
@@ -51,6 +52,25 @@ describe("ProgressDots", () => {
   it("labels the 1-based step from a 0-based index", () => {
     render(<ProgressDots index={1} total={4} />);
     expect(screen.getByRole("img", { name: "Step 2 of 4" })).toBeTruthy();
+  });
+});
+
+describe("FlowFrame", () => {
+  it("lets a long title wrap and gives the progress dots their own line below md", () => {
+    render(<FlowFrame title="A few quick checks on September" step={{ index: 0, total: 3 }} onClose={() => undefined}>Body</FlowFrame>);
+    const title = screen.getByRole("heading", { name: "A few quick checks on September" });
+    expect(title.className).not.toContain("truncate");
+    const dots = screen.getByRole("img", { name: "Step 1 of 3" });
+    expect(dots.parentElement!.className).toContain("basis-full"); // a line of its own...
+    expect(dots.parentElement!.className).toContain("md:basis-auto"); // ...until md, where it shares the title's row
+    expect(title.parentElement!.className).toContain("flex-wrap");
+  });
+
+  it("keeps its body, however long, in front of the action bar", () => {
+    render(<FlowFrame title="Done" onClose={() => undefined} primary={{ label: "Next" }}><p>Keep a copy</p></FlowFrame>);
+    const body = screen.getByText("Keep a copy").parentElement!;
+    const bar = screen.getByRole("button", { name: "Next" }).parentElement!;
+    expect(body.compareDocumentPosition(bar) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });
 
